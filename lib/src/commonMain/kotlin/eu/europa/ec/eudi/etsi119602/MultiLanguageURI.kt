@@ -14,9 +14,11 @@ public data class MultiLanguageURI(
 @Serializable
 @JvmInline
 public value class URIValue(
-    public val uri: String,
+    public val value: String,
 ) {
     init {
-        requireNotBlank(uri, ETSI19602.URI_VALUE)
+        requireNotBlank(value, ETSI19602.URI_VALUE)
     }
+
+    override fun toString(): String = value
 }

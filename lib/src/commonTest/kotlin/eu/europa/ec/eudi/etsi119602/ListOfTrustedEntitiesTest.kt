@@ -6,7 +6,6 @@ import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
-
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -17,20 +16,38 @@ import kotlin.test.Test
 
 class ListOfTrustedEntitiesTest {
     @Test
-    fun walletProviderLoTE() =
-        runTest {
-            val loteJWT =
-                createHttpClient(true).use { httpClient ->
-                    httpClient
-                        .get("https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json")
-                        .bodyAsText()
-                        .let { fromCompact(it).getOrThrow() }
-                }
+    fun pidProviderLoTE() = runTest {
+        val listOfTrustedEntities =
+            getLoTE("https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json")
+        println(listOfTrustedEntities.schemeInformation)
+        listOfTrustedEntities.entities.forEach { println(it) }
+        with(PIDProvidersProfile) {
+            listOfTrustedEntities.ensureScheme()
+        }
+    }
 
-            val (header, payload) = loteJWT
+    @Test
+    fun walletProviderLoTE() = runTest {
+        val listOfTrustedEntities =
+            getLoTE("https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json")
+        println(listOfTrustedEntities.schemeInformation)
+        listOfTrustedEntities.entities.forEach { println(it) }
+        with(WalletProvidersProfile) {
+            listOfTrustedEntities.ensureScheme()
+        }
+    }
+
+
+    private suspend fun getLoTE(uri: String): ListOfTrustedEntities =
+        createHttpClient(true).use { httpClient ->
+            val (_, payload) = httpClient
+                .get(uri)
+                .bodyAsText()
+                .let { fromCompact(it).getOrThrow() }
             println(JsonSupportDebug.encodeToString(payload))
             val loTEClaims = JsonSupportDebug.decodeFromJsonElement<ListOfTrustedEntitiesClaims>(payload)
-            println(loTEClaims.listOfTrustedEntities.schemeInformation)
+            loTEClaims.listOfTrustedEntities
+
         }
 }
 

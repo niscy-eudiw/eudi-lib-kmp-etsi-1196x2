@@ -1,6 +1,13 @@
 package eu.europa.ec.eudi.etsi119602
 
-import kotlinx.serialization.*
+import eu.europa.ec.eudi.etsi119602.ListAndSchemeInformation.Companion.explicit
+import eu.europa.ec.eudi.etsi119602.ListAndSchemeInformation.Companion.implicit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.monthsUntil
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -9,6 +16,8 @@ import kotlin.time.ExperimentalTime
 /**
  * Information on the list of trusted entities and its issuing
  * scheme
+ * Information about the scheme within which the LoTE is issued may be provided either
+ * [implicitly][implicit] or []explicitly][explicit]
  */
 @Serializable
 public data class ListAndSchemeInformation
@@ -27,21 +36,28 @@ internal constructor(
      * At the first release of the LoTE, the value of the sequence number shall be 1
      */
     @SerialName(ETSI19602.LOTE_SEQUENCE_NUMBER) @Required val sequenceNumber: Int,
+    /**
+     * The type of the list of trusted entities. I
+     */
     @SerialName(ETSI19602.LOTE_TYPE) val type: LoTEType? = null,
     /**
      * The name of the entity in charge of establishing, publishing,
      * signing, and maintaining the list of trusted entities
      */
     @SerialName(ETSI19602.SCHEME_OPERATOR_NAME) @Required val schemeOperatorName: List<MultiLangString>,
+    /**
+     * The address of the legal entity or mandated organization
+     * identified in the 'Scheme operator name' component (clause 6.3.4) for both postal and electronic communication
+     */
     @SerialName(ETSI19602.SCHEME_OPERATOR_ADDRESS) val schemeOperatorAddress: SchemeOperatorAddress? = null,
     @SerialName(ETSI19602.SCHEME_NAME) val schemeName: List<MultiLangString>? = null,
     @SerialName(ETSI19602.SCHEME_INFORMATION_URI) val schemeInformationURI: List<MultiLanguageURI>? = null,
     @SerialName(ETSI19602.STATUS_DETERMINATION_APPROACH) val statusDeterminationApproach: String? = null,
     @SerialName(ETSI19602.SCHEME_TYPE_COMMUNITY_RULES) val schemeTypeCommunityRules: List<MultiLanguageURI>? = null,
-    @SerialName(ETSI19602.SCHEME_TERRITORY) val schemeTerritory: SchemeTerritory? = null,
+    @SerialName(ETSI19602.SCHEME_TERRITORY) val schemeTerritory: CountryCode? = null,
     @SerialName(ETSI19602.POLICY_OR_LEGAL_NOTICE) val policyOrLegalNotice: List<PolicyOrLegalNotice>? = null,
     @SerialName(ETSI19602.HISTORICAL_INFORMATION_PERIOD) val historicalInformationPeriod: HistoricalInformationPeriod? = null,
-    @SerialName(ETSI19602.POINTER_TO_OTHER_LOTE) val pointerToOtherLote: MultiLanguageURI? = null,
+    @SerialName(ETSI19602.POINTER_TO_OTHER_LOTE) val pointersToOtherLists: List<OtherLoTEPointer>? = null,
     @SerialName(ETSI19602.LIST_ISSUE_DATE_TIME) val listIssueDateTime: LoTEDateTime,
     @SerialName(ETSI19602.NEXT_UPDATE) val nextUpdate: LoTEDateTime,
     @SerialName(ETSI19602.DISTRIBUTION_POINTS) val distributionPoints: List<MultiLanguageURI>? = null,
@@ -59,21 +75,6 @@ internal constructor(
         requireNullOrNonEmpty(schemeExtensions, ETSI19602.SCHEME_EXTENSIONS)
     }
 
-    public fun ensureIsExplicit(): ListAndSchemeInformation =
-        apply {
-            fun checkNotNull(
-                v: Any?,
-                field: String,
-            ) = checkNotNull(v != null) { "$field must be set for explicit list" }
-            checkNotNull(type, ETSI19602.LOTE_TYPE)
-            checkNotNull(schemeOperatorAddress, ETSI19602.SCHEME_OPERATOR_ADDRESS)
-            checkNotNull(schemeName, ETSI19602.SCHEME_NAME)
-            checkNotNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
-            checkNotNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
-            checkNotNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
-            checkNotNull(schemeTerritory, ETSI19602.SCHEME_TERRITORY)
-            checkNotNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
-        }
 
     public companion object {
         @OptIn(ExperimentalTime::class)
@@ -82,9 +83,9 @@ internal constructor(
             type: LoTEType? = null,
             schemeOperatorName: List<MultiLangString>,
             schemeOperatorAddress: SchemeOperatorAddress? = null,
-            schemeTerritory: SchemeTerritory? = null,
+            schemeTerritory: CountryCode? = null,
             historicalInformationPeriod: HistoricalInformationPeriod? = null,
-            pointerToOtherLote: MultiLanguageURI? = null,
+            pointerToOtherLote: List<OtherLoTEPointer>? = null,
             listIssueDateTime: LoTEDateTime,
             nextUpdate: LoTEDateTime,
             distributionPoints: List<MultiLanguageURI>? = null,
@@ -103,7 +104,7 @@ internal constructor(
                 schemeTerritory = schemeTerritory,
                 policyOrLegalNotice = null,
                 historicalInformationPeriod = historicalInformationPeriod,
-                pointerToOtherLote = pointerToOtherLote,
+                pointersToOtherLists = pointerToOtherLote,
                 listIssueDateTime = listIssueDateTime,
                 nextUpdate = nextUpdate,
                 distributionPoints = distributionPoints,
@@ -120,10 +121,10 @@ internal constructor(
             schemeInformationURI: List<MultiLanguageURI>,
             statusDeterminationApproach: String,
             schemeTypeCommunityRules: List<MultiLanguageURI>,
-            schemeTerritory: SchemeTerritory,
+            schemeTerritory: CountryCode,
             policyOrLegalNotice: List<PolicyOrLegalNotice>,
             historicalInformationPeriod: HistoricalInformationPeriod? = null,
-            pointerToOtherLote: MultiLanguageURI? = null,
+            pointerToOtherLote: List<OtherLoTEPointer>? = null,
             listIssueDateTime: LoTEDateTime,
             nextUpdate: LoTEDateTime,
             distributionPoints: List<MultiLanguageURI>? = null,
@@ -142,7 +143,7 @@ internal constructor(
                 schemeTerritory = schemeTerritory,
                 policyOrLegalNotice = policyOrLegalNotice,
                 historicalInformationPeriod = historicalInformationPeriod,
-                pointerToOtherLote = pointerToOtherLote,
+                pointersToOtherLists = pointerToOtherLote,
                 listIssueDateTime = listIssueDateTime,
                 nextUpdate = nextUpdate,
                 distributionPoints = distributionPoints,
@@ -171,7 +172,11 @@ internal constructor(
 @JvmInline
 public value class LoTEType(
     public val value: String,
-)
+) {
+    public companion object {
+
+    }
+}
 
 /**
  * The SchemeOperatorAddress component specifies the address of the legal entity or mandated organization
@@ -184,18 +189,9 @@ public data class SchemeOperatorAddress(
 ) {
     init {
         requireNonEmpty(postalAddresses, ETSI19602.SCHEME_OPERATOR_POSTAL_ADDRESS)
-        requireNonEmpty(electronicAddresses, ETSI19602.SCHEME_OPERATOR_ELECTRONIC_ADDRESS)
-    }
-}
-
-@Serializable
-@JvmInline
-public value class SchemeTerritory(
-    public val value: String,
-) {
-    init {
-        require(value.isNotBlank()) { "Scheme territory cannot be blank" }
-        require(value.length == 2) { "Scheme territory size must be 2 characters" }
+        require(electronicAddresses.size >= 2) {
+            "${ETSI19602.SCHEME_OPERATOR_ELECTRONIC_ADDRESS} must contain at least an e-mail and a web-site address"
+        }
     }
 }
 
@@ -228,3 +224,103 @@ public value class HistoricalInformationPeriod(
     public val value: Int,
 )
 
+
+@Serializable
+public data class OtherLoTEPointer(
+    @SerialName(ETSI19602.LOTE_LOCATION) @Required val location: String, //URI
+    @SerialName(ETSI19602.SERVICE_DIGITAL_IDENTITIES) @Required val serviceDigitalIdentities: List<ServiceDigitalIdentity>,
+    @SerialName(ETSI19602.LOTE_QUALIFIERS) @Required val qualifiers: List<LoTEQualifier>,
+) {
+    init {
+        requireNonEmpty(serviceDigitalIdentities, ETSI19602.SERVICE_DIGITAL_IDENTITIES)
+        requireNonEmpty(qualifiers, ETSI19602.LOTE_QUALIFIERS)
+    }
+}
+
+@Serializable
+public data class LoTEQualifier(
+    @SerialName(ETSI19602.LOTE_TYPE) val type: LoTEType,
+    @SerialName(ETSI19602.SCHEME_OPERATOR_NAME) @Required val schemeOperatorName: List<MultiLangString>,
+    @SerialName(ETSI19602.SCHEME_TYPE_COMMUNITY_RULES) val schemeTypeCommunityRules: List<MultiLanguageURI>? = null,
+    @SerialName(ETSI19602.SCHEME_TERRITORY) val schemeTerritory: CountryCode? = null,
+    @SerialName(ETSI19602.MIME_TYPE) val mimeType: String,
+) {
+    init {
+        requireNonEmpty(schemeOperatorName, ETSI19602.SCHEME_OPERATOR_NAME)
+        requireNotBlank(mimeType, ETSI19602.MIME_TYPE)
+    }
+}
+
+public object ListAndSchemeInformationAssertions {
+
+    public fun ListAndSchemeInformation.ensureIsExplicit() {
+        checkNotNull(type, ETSI19602.LOTE_TYPE)
+        checkNotNull(schemeOperatorAddress, ETSI19602.SCHEME_OPERATOR_ADDRESS)
+        checkNotNull(schemeName, ETSI19602.SCHEME_NAME)
+        checkNotNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
+        checkNotNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
+        checkNotNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
+        checkNotNull(schemeTerritory, ETSI19602.SCHEME_TERRITORY)
+        checkNotNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
+    }
+
+    public fun ListAndSchemeInformation.ensureTypeIs(expected: LoTEType) {
+        check(type == expected) {
+            "Invalid ${ETSI19602.LOTE_TYPE}. Expected $expected, got $type"
+        }
+    }
+
+    public fun ListAndSchemeInformation.ensureStatusDeterminationApproachIs(expected: String) {
+        check(statusDeterminationApproach == expected) {
+            "Invalid ${ETSI19602.STATUS_DETERMINATION_APPROACH}. Expected $expected, got $statusDeterminationApproach"
+        }
+    }
+
+    public fun ListAndSchemeInformation.ensureSchemeCommunityRulesIs(expected: List<MultiLanguageURI>) {
+        val actual = checkNotNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
+        check(actual.size == expected.size && actual.none { it !in expected }) {
+            "Invalid ${ETSI19602.SCHEME_TYPE_COMMUNITY_RULES}. Expected $expected, got $actual"
+        }
+    }
+
+    public fun ListAndSchemeInformation.ensureSchemeTerritoryIs(expected: CountryCode) {
+        check(schemeTerritory == expected) {
+            "Invalid ${ETSI19602.SCHEME_TERRITORY}. Expected $expected, got $schemeTerritory"
+        }
+    }
+
+    public fun ListAndSchemeInformation.ensureNextUpdateIsWithinMonths(
+        months: Int
+    ) {
+        val monthsUntilNextUpdate = nextUpdate.monthsUntil(listIssueDateTime, TimeZone.UTC)
+        check(monthsUntilNextUpdate <= months) {
+            "${ETSI19602.NEXT_UPDATE} must be within $months months from ${ETSI19602.LIST_ISSUE_DATE_TIME}, got $monthsUntilNextUpdate months"
+        }
+    }
+
+    public fun ListAndSchemeInformation.ensureNoHistoricalInformationPeriodProvided() {
+        check(historicalInformationPeriod == null) {
+            "${ETSI19602.HISTORICAL_INFORMATION_PERIOD} is not allowed"
+        }
+    }
+
+    internal fun ListAndSchemeInformation.ensureWalletProvidersScheme(profile: Profile) {
+        with(ListAndSchemeInformationAssertions) {
+            if (profile.scheme == Scheme.EXPLICIT) {
+                ensureIsExplicit()
+            }
+            ensureTypeIs(profile.type)
+            ensureStatusDeterminationApproachIs(profile.statusDeterminationApproach)
+            ensureSchemeCommunityRulesIs(profile.schemeCommunityRules)
+            ensureSchemeTerritoryIs(profile.schemeTerritory)
+        }
+
+        when(profile.historicalInformationPeriod){
+            ValueRequirement.REQUIRED -> TODO()
+            ValueRequirement.OPTIONAL -> TODO()
+            ValueRequirement.ABSENT ->ensureNoHistoricalInformationPeriodProvided()
+        }
+
+        ensureNextUpdateIsWithinMonths(profile.maxMonthsUntilNextUpdate)
+    }
+}

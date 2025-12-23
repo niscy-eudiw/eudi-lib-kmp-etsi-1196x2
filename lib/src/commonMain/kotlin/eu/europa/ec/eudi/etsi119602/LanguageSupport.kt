@@ -15,6 +15,9 @@ public value class Language(
 
     override fun toString(): String = value
 
+    public companion object {
+        public val EN: Language = Language("en")
+    }
 }
 
 @Serializable
