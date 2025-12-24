@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.etsi119602
 
-import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
 private fun cannotBeBlankMsg(field: String) = "$field cannot be blank"
@@ -42,7 +41,6 @@ internal fun requireNonEmpty(list: List<*>, name: String) {
     require(list.isNotEmpty()) { "$name cannot be empty" }
 }
 
-@OptIn(ExperimentalContracts::class)
 internal inline fun <reified T : Any> checkNotNull(
     value: T?,
     field: String,
@@ -53,14 +51,12 @@ internal inline fun <reified T : Any> checkNotNull(
     return checkNotNull(value) { "$field must be set" }
 }
 
-@OptIn(ExperimentalContracts::class)
-internal inline fun <reified T : Any> checkNull(
+internal inline fun <reified T : Any> checkIsNull(
     value: T?,
     field: String,
-): T? {
+) {
     contract {
         returns() implies (value == null)
     }
     check(value == null) { "$field must not be set" }
-    return value
 }

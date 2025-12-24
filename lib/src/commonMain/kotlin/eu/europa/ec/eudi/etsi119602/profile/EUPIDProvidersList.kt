@@ -28,10 +28,7 @@ public val EUPIDProvidersList: ListOfTrustedEntitiesProfile =
     DefaultListOfTrustedEntitiesProfile(
         name = ETSI19602.EU_PID_PROVIDERS_LOTE,
         statusDeterminationApproach = ETSI19602.EU_PID_PROVIDERS_STATUS_DETERMINATION_APPROACH,
-        schemeCommunityRules =
-            listOf(
-                MultiLanguageURI.en(URIValue(ETSI19602.EU_PID_PROVIDERS_SCHEME_COMMUNITY_RULES)),
-            ),
+        schemeCommunityRules = listOf(MultiLanguageURI.en(URIValue(ETSI19602.EU_PID_PROVIDERS_SCHEME_COMMUNITY_RULES))),
         schemeTerritory = CountryCode.EU,
         maxMonthsUntilNextUpdate = 6,
         historicalInformationPeriod = ValueRequirement.Absent

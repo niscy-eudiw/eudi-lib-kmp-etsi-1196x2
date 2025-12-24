@@ -97,11 +97,11 @@ public interface ListAndSchemeInformationAssertions {
     }
 
     public fun ListAndSchemeInformation.ensureIsImplicit() {
-        checkNull(schemeName, ETSI19602.SCHEME_NAME)
-        checkNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
-        checkNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
-        checkNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
-        checkNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
+        checkIsNull(schemeName, ETSI19602.SCHEME_NAME)
+        checkIsNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
+        checkIsNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
+        checkIsNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
+        checkIsNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
     }
 
     public fun ListAndSchemeInformation.ensureTypeIs(expected: LoTEType) {
@@ -149,7 +149,7 @@ public interface ListAndSchemeInformationAssertions {
             }
 
             is ValueRequirement.Absent ->
-                checkNull(historicalInformationPeriod, ETSI19602.HISTORICAL_INFORMATION_PERIOD)
+                checkIsNull(historicalInformationPeriod, ETSI19602.HISTORICAL_INFORMATION_PERIOD)
         }
     }
 

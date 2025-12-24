@@ -36,6 +36,7 @@ kotlin {
                 "kotlin.io.encoding.ExperimentalEncodingApi",
                 "kotlin.ExperimentalStdlibApi",
                 "kotlin.time.ExperimentalTime",
+                "kotlin.contracts.ExperimentalContracts"
             )
         freeCompilerArgs =
             listOf(
