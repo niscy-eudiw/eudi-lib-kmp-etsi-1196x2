@@ -36,7 +36,7 @@ kotlin {
                 "kotlin.io.encoding.ExperimentalEncodingApi",
                 "kotlin.ExperimentalStdlibApi",
                 "kotlin.time.ExperimentalTime",
-                "kotlin.contracts.ExperimentalContracts"
+                "kotlin.contracts.ExperimentalContracts",
             )
         freeCompilerArgs =
             listOf(
@@ -85,7 +85,6 @@ kotlin {
                 api(libs.kotlinx.serialization.json)
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.datetime)
-
             }
         }
 

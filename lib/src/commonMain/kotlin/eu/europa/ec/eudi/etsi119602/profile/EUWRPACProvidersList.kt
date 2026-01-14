@@ -22,12 +22,12 @@ import eu.europa.ec.eudi.etsi119602.URIValue
 
 public val EUWRPACProvidersList: ListOfTrustedEntitiesProfile =
     DefaultListOfTrustedEntitiesProfile(
-        name = ETSI19602.EU_WRPAC_LOTE,
-        statusDeterminationApproach = ETSI19602.EU_WRPAC_STATUS_DETERMINATION_APPROACH,
+        name = ETSI19602.EU_WRPAC_PROVIDERS_LOTE,
+        statusDeterminationApproach = ETSI19602.EU_WRPAC_PROVIDERS_STATUS_DETERMINATION_APPROACH,
         schemeCommunityRules = listOf(
-            MultiLanguageURI.en(URIValue(ETSI19602.EU_WRPAC_SCHEME_COMMUNITY_RULES))
+            MultiLanguageURI.en(URIValue(ETSI19602.EU_WRPAC_PROVIDERS_SCHEME_COMMUNITY_RULES)),
         ),
         schemeTerritory = CountryCode.EU,
         maxMonthsUntilNextUpdate = 6,
-        historicalInformationPeriod = ValueRequirement.Absent
+        historicalInformationPeriod = ValueRequirement.Absent,
     )

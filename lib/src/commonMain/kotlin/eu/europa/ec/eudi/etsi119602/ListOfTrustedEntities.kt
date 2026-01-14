@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.etsi119602
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,14 +24,38 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class ListOfTrustedEntities(
     @SerialName(ETSI19602.LIST_AND_SCHEME_INFORMATION) @Required val schemeInformation: ListAndSchemeInformation,
-    @SerialName(ETSI19602.TRUSTED_ENTITIES_LIST) @Required val entities: List<TrustedEntity>,
+    @SerialName(ETSI19602.TRUSTED_ENTITIES_LIST) val entities: List<TrustedEntity>? = null,
 ) {
     init {
-        requireNonEmpty(entities, ETSI19602.TRUSTED_ENTITIES_LIST)
+        if (entities != null) {
+            requireNonEmpty(entities, ETSI19602.TRUSTED_ENTITIES_LIST)
+        }
     }
 }
 
+/**
+ * This class represents the claims - payload - of a list of trusted entities
+ */
 @Serializable
 public data class ListOfTrustedEntitiesClaims(
     @SerialName(ETSI19602.LOTE) @Required val listOfTrustedEntities: ListOfTrustedEntities,
 )
+
+public interface ListOfTrustedEntitiesLens {
+
+    public fun ListOfTrustedEntities.digitalIdentitiesForServicesIdentifiesAs(serviceTypeIdentifier: URI): Flow<ServiceDigitalIdentity> =
+        digitalIdentities { it.serviceTypeIdentifier == serviceTypeIdentifier }
+
+    public fun ListOfTrustedEntities.digitalIdentities(criteria: (ServiceInformation) -> Boolean = { _ -> true }): Flow<ServiceDigitalIdentity> =
+        flow {
+            entities.orEmpty().forEach { entity ->
+                entity.services.forEach { service ->
+                    if (criteria(service.serviceInformation)) {
+                        emit(service.serviceInformation.serviceDigitalIdentity)
+                    }
+                }
+            }
+        }
+
+    public companion object : ListOfTrustedEntitiesLens
+}

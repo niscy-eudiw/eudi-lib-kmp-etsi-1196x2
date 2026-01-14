@@ -42,7 +42,7 @@ public interface ListOfTrustedEntitiesProfile {
             schemeCommunityRules: List<MultiLanguageURI>,
             schemeTerritory: CountryCode,
             maxMonthsUntilNextUpdate: Int,
-            historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>
+            historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>,
         ): ListOfTrustedEntitiesProfile =
             DefaultListOfTrustedEntitiesProfile(
                 name,
@@ -50,19 +50,19 @@ public interface ListOfTrustedEntitiesProfile {
                 schemeCommunityRules,
                 schemeTerritory,
                 maxMonthsUntilNextUpdate,
-                historicalInformationPeriod
+                historicalInformationPeriod,
             )
     }
 }
 
-
+@Suppress("FunctionName")
 internal fun DefaultListOfTrustedEntitiesProfile(
     name: String,
     statusDeterminationApproach: String,
     schemeCommunityRules: List<MultiLanguageURI>,
     schemeTerritory: CountryCode,
     maxMonthsUntilNextUpdate: Int,
-    historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>
+    historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>,
 ): ListOfTrustedEntitiesProfile =
     object : ListOfTrustedEntitiesProfile, ListAndSchemeInformationAssertions {
         public override val type: LoTEType get() = LoTEType.of(name)
@@ -80,7 +80,6 @@ internal fun DefaultListOfTrustedEntitiesProfile(
             } catch (e: IllegalArgumentException) {
                 throw IllegalArgumentException("Violation of $name: ${e.message}")
             }
-
     }
 
 public interface ListAndSchemeInformationAssertions {

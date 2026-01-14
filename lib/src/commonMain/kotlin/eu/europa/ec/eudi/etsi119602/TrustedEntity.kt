@@ -18,7 +18,8 @@ package eu.europa.ec.eudi.etsi119602
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 public data class TrustedEntity(
@@ -55,4 +56,43 @@ public data class TEAddress(
     }
 }
 
-public typealias TrustedEntityService = JsonObject
+@Serializable
+public data class TrustedEntityService(
+    @SerialName(ETSI19602.SERVICE_INFORMATION) @Required val serviceInformation: ServiceInformation,
+    @SerialName(ETSI19602.SERVICE_HISTORY) val serviceHistory: ServiceHistory? = null,
+)
+
+@Serializable
+public data class ServiceInformation(
+    @SerialName(ETSI19602.SERVICE_NAME) @Required val serviceName: List<MultilanguageString>,
+    @SerialName(ETSI19602.SERVICE_DIGITAL_IDENTITY) @Required val serviceDigitalIdentity: ServiceDigitalIdentity,
+    @SerialName(ETSI19602.SERVICE_TYPE_IDENTIFIER) val serviceTypeIdentifier: URI? = null,
+    @SerialName(ETSI19602.SERVICE_STATUS) val serviceStatus: URI? = null,
+    @SerialName(ETSI19602.STATUS_STARTING_TIME) val statusStartingTime: LoTEDateTime? = null,
+    @SerialName(ETSI19602.SCHEME_SERVICE_DEFINITION_URI) val schemeServiceDefinitionURI: List<MultiLanguageURI>? = null,
+    @SerialName(ETSI19602.SERVICE_SUPPLY_POINTS) val serviceSupplyPoints: List<ServiceSupplyPointURI>? = null,
+    @SerialName(ETSI19602.SERVICE_DEFINITION_URI) val serviceDefinitionURI: List<MultiLanguageURI>? = null,
+    @SerialName(ETSI19602.SERVICE_INFORMATION_EXTENSIONS) val serviceInformationExtensions: JsonArray? = null,
+) {
+    init {
+        requireNonEmpty(serviceName, ETSI19602.SERVICE_NAME)
+        requireNullOrNonEmpty(serviceSupplyPoints, ETSI19602.SERVICE_SUPPLY_POINTS)
+        requireNullOrNonEmpty(schemeServiceDefinitionURI, ETSI19602.SCHEME_SERVICE_DEFINITION_URI)
+        requireNullOrNonEmpty(serviceDefinitionURI, ETSI19602.SERVICE_DEFINITION_URI)
+        requireNullOrNonEmpty(serviceInformationExtensions, ETSI19602.SERVICE_INFORMATION_EXTENSIONS)
+    }
+}
+
+public typealias ServiceHistory = JsonElement
+public typealias URI = String
+
+@Serializable
+public data class ServiceSupplyPointURI(
+    @SerialName(ETSI19602.SERVICE_SUPPLY_POINT_URI_VALUE) @Required val uriValue: URI,
+    @SerialName(ETSI19602.SERVICE_SUPPLY_POINT_URI_TYPE) val serviceType: URI? = null,
+) {
+    init {
+        requireNotBlank(uriValue, ETSI19602.SERVICE_SUPPLY_POINT_URI_VALUE)
+        requireNullOrNotBlank(serviceType, ETSI19602.SERVICE_SUPPLY_POINT_URI_TYPE)
+    }
+}

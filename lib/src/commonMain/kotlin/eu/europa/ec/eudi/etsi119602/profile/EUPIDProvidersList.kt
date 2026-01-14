@@ -31,5 +31,5 @@ public val EUPIDProvidersList: ListOfTrustedEntitiesProfile =
         schemeCommunityRules = listOf(MultiLanguageURI.en(URIValue(ETSI19602.EU_PID_PROVIDERS_SCHEME_COMMUNITY_RULES))),
         schemeTerritory = CountryCode.EU,
         maxMonthsUntilNextUpdate = 6,
-        historicalInformationPeriod = ValueRequirement.Absent
+        historicalInformationPeriod = ValueRequirement.Absent,
     )

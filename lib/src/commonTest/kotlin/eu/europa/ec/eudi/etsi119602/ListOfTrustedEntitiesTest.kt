@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.etsi119602
 
+import eu.europa.ec.eudi.etsi119602.profile.EULens
 import eu.europa.ec.eudi.etsi119602.profile.EUPIDProvidersList
 import eu.europa.ec.eudi.etsi119602.profile.EUWRPACProvidersList
 import eu.europa.ec.eudi.etsi119602.profile.EUWalletProvidersList
@@ -24,6 +25,10 @@ import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.flattenConcat
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -33,14 +38,25 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 
 class ListOfTrustedEntitiesTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun pidProviderLoTE() = runTest {
         val listOfTrustedEntities =
             getLoTE("https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json")
         println(listOfTrustedEntities.schemeInformation)
-        listOfTrustedEntities.entities.forEach { println(it) }
+        listOfTrustedEntities.entities?.forEachIndexed { index, entity ->
+            val name = entity.information.name.first().value
+            println("$index: $name")
+        }
         with(EUPIDProvidersList) {
             listOfTrustedEntities.checkSchemeInformation()
+        }
+        with(EULens.EUPIDProvidersList) {
+            val certs = listOfTrustedEntities.digitalIdentitiesOfIssuanceServices()
+                .mapNotNull { digitalIdentity -> digitalIdentity.x509Certificates?.asFlow() }
+                .flattenConcat()
+
+            certs.collect { println(it.value) }
         }
     }
 
@@ -49,7 +65,7 @@ class ListOfTrustedEntitiesTest {
         val listOfTrustedEntities =
             getLoTE("https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json")
         println(listOfTrustedEntities.schemeInformation)
-        listOfTrustedEntities.entities.forEach { println(it) }
+        listOfTrustedEntities.entities?.forEach { println(it) }
         with(EUWalletProvidersList) {
             listOfTrustedEntities.checkSchemeInformation()
         }
@@ -60,7 +76,7 @@ class ListOfTrustedEntitiesTest {
         val listOfTrustedEntities =
             getLoTE("https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json")
         println(listOfTrustedEntities.schemeInformation)
-        listOfTrustedEntities.entities.forEach { println(it) }
+        listOfTrustedEntities.entities?.forEach { println(it) }
         with(EUWRPACProvidersList) {
             listOfTrustedEntities.checkSchemeInformation()
         }
