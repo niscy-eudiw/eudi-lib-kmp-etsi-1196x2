@@ -49,15 +49,16 @@ class ListOfTrustedEntitiesTest {
             println("$index: $name")
         }
         with(EUPIDProvidersList) {
-            listOfTrustedEntities.checkSchemeInformation()
-        }
-        with(EULens.EUPIDProvidersList) {
-            val certs = listOfTrustedEntities.digitalIdentitiesOfIssuanceServices()
-                .mapNotNull { digitalIdentity -> digitalIdentity.x509Certificates?.asFlow() }
-                .flattenConcat()
+            listOfTrustedEntities.ensureProfile()
+            with(EULens(this)) {
+                val certs = listOfTrustedEntities.digitalIdentitiesOfIssuanceServices()
+                    .mapNotNull { digitalIdentity -> digitalIdentity.x509Certificates?.asFlow() }
+                    .flattenConcat()
 
-            certs.collect { println(it.value) }
+                certs.collect { println(it.value) }
+            }
         }
+
     }
 
     @Test
@@ -67,7 +68,7 @@ class ListOfTrustedEntitiesTest {
         println(listOfTrustedEntities.schemeInformation)
         listOfTrustedEntities.entities?.forEach { println(it) }
         with(EUWalletProvidersList) {
-            listOfTrustedEntities.checkSchemeInformation()
+            listOfTrustedEntities.ensureProfile()
         }
     }
 
@@ -78,7 +79,7 @@ class ListOfTrustedEntitiesTest {
         println(listOfTrustedEntities.schemeInformation)
         listOfTrustedEntities.entities?.forEach { println(it) }
         with(EUWRPACProvidersList) {
-            listOfTrustedEntities.checkSchemeInformation()
+            listOfTrustedEntities.ensureProfile()
         }
     }
 

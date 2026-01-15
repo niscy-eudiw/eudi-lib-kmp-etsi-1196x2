@@ -40,22 +40,3 @@ public data class ListOfTrustedEntities(
 public data class ListOfTrustedEntitiesClaims(
     @SerialName(ETSI19602.LOTE) @Required val listOfTrustedEntities: ListOfTrustedEntities,
 )
-
-public interface ListOfTrustedEntitiesLens {
-
-    public fun ListOfTrustedEntities.digitalIdentitiesForServicesIdentifiesAs(serviceTypeIdentifier: URI): Flow<ServiceDigitalIdentity> =
-        digitalIdentities { it.serviceTypeIdentifier == serviceTypeIdentifier }
-
-    public fun ListOfTrustedEntities.digitalIdentities(criteria: (ServiceInformation) -> Boolean = { _ -> true }): Flow<ServiceDigitalIdentity> =
-        flow {
-            entities.orEmpty().forEach { entity ->
-                entity.services.forEach { service ->
-                    if (criteria(service.serviceInformation)) {
-                        emit(service.serviceInformation.serviceDigitalIdentity)
-                    }
-                }
-            }
-        }
-
-    public companion object : ListOfTrustedEntitiesLens
-}

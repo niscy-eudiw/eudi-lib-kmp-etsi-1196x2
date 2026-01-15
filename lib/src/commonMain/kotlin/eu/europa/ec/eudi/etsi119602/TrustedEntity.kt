@@ -34,9 +34,9 @@ public data class TrustedEntity(
 @Serializable
 public data class TrustedEntityInformation(
     @SerialName(ETSI19602.TE_NAME) @Required val name: List<MultilanguageString>,
-    @SerialName(ETSI19602.TE_TRADE_NAME) val tradeName: List<MultilanguageString>? = null,
     @SerialName(ETSI19602.TE_ADDRESS) @Required val address: TEAddress,
     @SerialName(ETSI19602.TE_INFORMATION_URI) @Required val informationURI: List<MultiLanguageURI>,
+    @SerialName(ETSI19602.TE_TRADE_NAME) val tradeName: List<MultilanguageString>? = null,
 ) {
     init {
         requireNonEmpty(name, ETSI19602.TE_NAME)
@@ -58,28 +58,28 @@ public data class TEAddress(
 
 @Serializable
 public data class TrustedEntityService(
-    @SerialName(ETSI19602.SERVICE_INFORMATION) @Required val serviceInformation: ServiceInformation,
-    @SerialName(ETSI19602.SERVICE_HISTORY) val serviceHistory: ServiceHistory? = null,
+    @SerialName(ETSI19602.SERVICE_INFORMATION) @Required val information: ServiceInformation,
+    @SerialName(ETSI19602.SERVICE_HISTORY) val history: ServiceHistory? = null,
 )
 
 @Serializable
 public data class ServiceInformation(
-    @SerialName(ETSI19602.SERVICE_NAME) @Required val serviceName: List<MultilanguageString>,
-    @SerialName(ETSI19602.SERVICE_DIGITAL_IDENTITY) @Required val serviceDigitalIdentity: ServiceDigitalIdentity,
-    @SerialName(ETSI19602.SERVICE_TYPE_IDENTIFIER) val serviceTypeIdentifier: URI? = null,
-    @SerialName(ETSI19602.SERVICE_STATUS) val serviceStatus: URI? = null,
+    @SerialName(ETSI19602.SERVICE_NAME) @Required val name: List<MultilanguageString>,
+    @SerialName(ETSI19602.SERVICE_DIGITAL_IDENTITY) @Required val digitalIdentity: ServiceDigitalIdentity,
+    @SerialName(ETSI19602.SERVICE_TYPE_IDENTIFIER) val typeIdentifier: URI? = null,
+    @SerialName(ETSI19602.SERVICE_STATUS) val status: URI? = null,
     @SerialName(ETSI19602.STATUS_STARTING_TIME) val statusStartingTime: LoTEDateTime? = null,
     @SerialName(ETSI19602.SCHEME_SERVICE_DEFINITION_URI) val schemeServiceDefinitionURI: List<MultiLanguageURI>? = null,
-    @SerialName(ETSI19602.SERVICE_SUPPLY_POINTS) val serviceSupplyPoints: List<ServiceSupplyPointURI>? = null,
-    @SerialName(ETSI19602.SERVICE_DEFINITION_URI) val serviceDefinitionURI: List<MultiLanguageURI>? = null,
-    @SerialName(ETSI19602.SERVICE_INFORMATION_EXTENSIONS) val serviceInformationExtensions: JsonArray? = null,
+    @SerialName(ETSI19602.SERVICE_SUPPLY_POINTS) val supplyPoints: List<ServiceSupplyPointURI>? = null,
+    @SerialName(ETSI19602.SERVICE_DEFINITION_URI) val definitionURI: List<MultiLanguageURI>? = null,
+    @SerialName(ETSI19602.SERVICE_INFORMATION_EXTENSIONS) val informationExtensions: JsonArray? = null,
 ) {
     init {
-        requireNonEmpty(serviceName, ETSI19602.SERVICE_NAME)
-        requireNullOrNonEmpty(serviceSupplyPoints, ETSI19602.SERVICE_SUPPLY_POINTS)
+        requireNonEmpty(name, ETSI19602.SERVICE_NAME)
+        requireNullOrNonEmpty(supplyPoints, ETSI19602.SERVICE_SUPPLY_POINTS)
         requireNullOrNonEmpty(schemeServiceDefinitionURI, ETSI19602.SCHEME_SERVICE_DEFINITION_URI)
-        requireNullOrNonEmpty(serviceDefinitionURI, ETSI19602.SERVICE_DEFINITION_URI)
-        requireNullOrNonEmpty(serviceInformationExtensions, ETSI19602.SERVICE_INFORMATION_EXTENSIONS)
+        requireNullOrNonEmpty(definitionURI, ETSI19602.SERVICE_DEFINITION_URI)
+        requireNullOrNonEmpty(informationExtensions, ETSI19602.SERVICE_INFORMATION_EXTENSIONS)
     }
 }
 

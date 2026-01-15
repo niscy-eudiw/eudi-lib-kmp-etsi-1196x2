@@ -26,12 +26,18 @@ import eu.europa.ec.eudi.etsi119602.URIValue
  */
 public val EUWalletProvidersList: ListOfTrustedEntitiesProfile =
     DefaultListOfTrustedEntitiesProfile(
-        name = ETSI19602.EU_WALLET_PROVIDERS_LOTE,
-        statusDeterminationApproach = ETSI19602.EU_WALLET_PROVIDERS_STATUS_DETERMINATION_APPROACH,
-        schemeCommunityRules = listOf(
-            MultiLanguageURI.en(URIValue(ETSI19602.EU_WALLET_PROVIDERS_SCHEME_COMMUNITY_RULES)),
+        ListAndSchemeInformationProfile(
+            name = ETSI19602.EU_WALLET_PROVIDERS_LOTE,
+            statusDeterminationApproach = ETSI19602.EU_WALLET_PROVIDERS_STATUS_DETERMINATION_APPROACH,
+            schemeCommunityRules = listOf(
+                MultiLanguageURI.en(URIValue(ETSI19602.EU_WALLET_PROVIDERS_SCHEME_COMMUNITY_RULES)),
+            ),
+            schemeTerritory = CountryCode.EU,
+            maxMonthsUntilNextUpdate = 6,
+            historicalInformationPeriod = ValueRequirement.Absent,
         ),
-        schemeTerritory = CountryCode.EU,
-        maxMonthsUntilNextUpdate = 6,
-        historicalInformationPeriod = ValueRequirement.Absent,
+        TrustedEntitiesProfile(
+            issuanceServiceTypeIdentifier = ETSI19602.EU_WALLET_PROVIDERS_SVC_TYPE_ISSUANCE,
+            revocationServiceTypeIdentifier = ETSI19602.EU_WALLET_PROVIDERS_SVC_TYPE_REVOCATION,
+        ),
     )

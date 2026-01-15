@@ -15,58 +15,54 @@
  */
 package eu.europa.ec.eudi.etsi119602.profile
 
-import eu.europa.ec.eudi.etsi119602.ETSI19602
 import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
-import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntitiesLens
 import eu.europa.ec.eudi.etsi119602.ServiceDigitalIdentity
+import eu.europa.ec.eudi.etsi119602.ServiceInformation
 import eu.europa.ec.eudi.etsi119602.URI
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+
 
 public interface EULens {
+
+    public fun ListOfTrustedEntities.digitalIdentities(predicate: suspend (ServiceInformation) -> Boolean = { _ -> true }): Flow<ServiceDigitalIdentity>
 
     public fun ListOfTrustedEntities.digitalIdentitiesOfIssuanceServices(): Flow<ServiceDigitalIdentity>
 
     public fun ListOfTrustedEntities.digitalIdentitiesOfRevocationServices(): Flow<ServiceDigitalIdentity>
 
     public companion object {
-        public val EUPIDProvidersList: EULens
-            get() = EULens(
-                issuanceServiceTypeIdentifier = ETSI19602.EU_PID_PROVIDERS_SVC_TYPE_ISSUANCE,
-                revocationServiceTypeIdentifier = ETSI19602.EU_PID_PROVIDERS_SVC_TYPE_REVOCATION,
-            )
-        public val EUWalletProvidersList: EULens
-            get() = EULens(
-                issuanceServiceTypeIdentifier = ETSI19602.EU_WALLET_PROVIDERS_SVC_TYPE_ISSUANCE,
-                revocationServiceTypeIdentifier = ETSI19602.EU_WALLET_PROVIDERS_SVC_TYPE_REVOCATION,
-            )
-        public val EUWRPACProvidersList: EULens
-            get() = EULens(
-                issuanceServiceTypeIdentifier = ETSI19602.EU_WRPAC_PROVIDERS_SVC_TYPE_ISSUANCE,
-                revocationServiceTypeIdentifier = ETSI19602.EU_WRPAC_PROVIDERS_SVC_TYPE_REVOCATION,
-            )
-
-        public val EUWRPRCProvidersList: EULens
-            get() = EULens(
-                issuanceServiceTypeIdentifier = ETSI19602.EU_WRPRC_PROVIDERS_SVC_TYPE_ISSUANCE,
-                revocationServiceTypeIdentifier = ETSI19602.EU_WRPRC_PROVIDERS_SVC_TYPE_REVOCATION,
-            )
-
-        public val EUPubEAAProvidersList: EULens
-            get() = EULens(
-                issuanceServiceTypeIdentifier = ETSI19602.EU_PUB_EAA_PROVIDERS_SVC_TYPE_ISSUANCE,
-                revocationServiceTypeIdentifier = ETSI19602.EU_PUB_EAA_PROVIDERS_SVC_TYPE_REVOCATION,
-            )
+        public operator fun invoke(profile: ListOfTrustedEntitiesProfile): EULens =
+            EULens(profile)
     }
 }
 
 private fun EULens(
-    issuanceServiceTypeIdentifier: URI,
-    revocationServiceTypeIdentifier: URI,
-): EULens = object : EULens, ListOfTrustedEntitiesLens {
+    profile: ListOfTrustedEntitiesProfile
+): EULens = object : EULens {
+
+    public override fun ListOfTrustedEntities.digitalIdentities(predicate: suspend (ServiceInformation) -> Boolean): Flow<ServiceDigitalIdentity> =
+        with(profile) {
+            ensureProfile()
+            flow {
+                entities.orEmpty().forEach { entity ->
+                    entity.services.forEach { service ->
+                        if (predicate(service.information)) {
+                            emit(service.information.digitalIdentity)
+                        }
+                    }
+                }
+            }
+        }
 
     override fun ListOfTrustedEntities.digitalIdentitiesOfIssuanceServices(): Flow<ServiceDigitalIdentity> =
-        digitalIdentitiesForServicesIdentifiesAs(issuanceServiceTypeIdentifier)
+        digitalIdentitiesForServiceType(profile.trustedEntities.issuanceServiceTypeIdentifier)
 
     override fun ListOfTrustedEntities.digitalIdentitiesOfRevocationServices(): Flow<ServiceDigitalIdentity> =
-        digitalIdentitiesForServicesIdentifiesAs(revocationServiceTypeIdentifier)
+        digitalIdentitiesForServiceType(profile.trustedEntities.revocationServiceTypeIdentifier)
+
+    private fun ListOfTrustedEntities.digitalIdentitiesForServiceType(serviceTypeIdentifier: URI): Flow<ServiceDigitalIdentity> =
+        digitalIdentities { it.typeIdentifier == serviceTypeIdentifier }
+
+
 }

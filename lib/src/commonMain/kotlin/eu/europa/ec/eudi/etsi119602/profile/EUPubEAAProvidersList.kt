@@ -22,10 +22,16 @@ import eu.europa.ec.eudi.etsi119602.URIValue
 
 public val EUPubEAAProvidersList: ListOfTrustedEntitiesProfile =
     DefaultListOfTrustedEntitiesProfile(
-        name = ETSI19602.EU_PUB_EAA_PROVIDERS_LOTE,
-        statusDeterminationApproach = ETSI19602.EU_PUB_EAA_PROVIDERS_STATUS_DETERMINATION_APPROACH,
-        schemeCommunityRules = listOf(MultiLanguageURI.en(URIValue(ETSI19602.EU_PUB_EAA_PROVIDERS_SCHEME_COMMUNITY_RULES))),
-        schemeTerritory = CountryCode.EU,
-        maxMonthsUntilNextUpdate = 6,
-        historicalInformationPeriod = ValueRequirement.Absent,
+        ListAndSchemeInformationProfile(
+            name = ETSI19602.EU_PUB_EAA_PROVIDERS_LOTE,
+            statusDeterminationApproach = ETSI19602.EU_PUB_EAA_PROVIDERS_STATUS_DETERMINATION_APPROACH,
+            schemeCommunityRules = listOf(MultiLanguageURI.en(URIValue(ETSI19602.EU_PUB_EAA_PROVIDERS_SCHEME_COMMUNITY_RULES))),
+            schemeTerritory = CountryCode.EU,
+            maxMonthsUntilNextUpdate = 6,
+            historicalInformationPeriod = ValueRequirement.Absent,
+        ),
+        TrustedEntitiesProfile(
+            issuanceServiceTypeIdentifier = ETSI19602.EU_PUB_EAA_PROVIDERS_SVC_TYPE_ISSUANCE,
+            revocationServiceTypeIdentifier = ETSI19602.EU_PUB_EAA_PROVIDERS_SVC_TYPE_REVOCATION,
+        ),
     )

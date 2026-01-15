@@ -88,6 +88,25 @@ internal constructor(
         requireNullOrNonEmpty(schemeExtensions, ETSI19602.SCHEME_EXTENSIONS)
     }
 
+    public fun ensureIsExplicit() {
+        checkNotNull(type, ETSI19602.LOTE_TYPE)
+        checkNotNull(schemeOperatorAddress, ETSI19602.SCHEME_OPERATOR_ADDRESS)
+        checkNotNull(schemeName, ETSI19602.SCHEME_NAME)
+        checkNotNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
+        checkNotNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
+        checkNotNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
+        checkNotNull(schemeTerritory, ETSI19602.SCHEME_TERRITORY)
+        checkNotNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
+    }
+
+    public fun ensureIsImplicit() {
+        checkIsNull(schemeName, ETSI19602.SCHEME_NAME)
+        checkIsNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
+        checkIsNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
+        checkIsNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
+        checkIsNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
+    }
+
     public companion object {
         @OptIn(ExperimentalTime::class)
         public fun implicit(

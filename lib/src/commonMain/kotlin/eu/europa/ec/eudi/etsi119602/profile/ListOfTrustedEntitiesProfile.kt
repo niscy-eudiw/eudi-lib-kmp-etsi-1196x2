@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.etsi119602.profile
 
 import eu.europa.ec.eudi.etsi119602.*
+import eu.europa.ec.eudi.etsi119602.profile.ListAndSchemeInformationProfile
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.monthsUntil
 
@@ -24,84 +25,104 @@ public sealed interface ValueRequirement<out T> {
     public data object Absent : ValueRequirement<Nothing>
 }
 
-public interface ListOfTrustedEntitiesProfile {
-    public val type: LoTEType
-    public val statusDeterminationApproach: String
-    public val schemeCommunityRules: List<MultiLanguageURI>
-    public val schemeTerritory: CountryCode
-    public val maxMonthsUntilNextUpdate: Int
-    public val historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>
-
-    @Throws(IllegalStateException::class)
-    public fun ListOfTrustedEntities.checkSchemeInformation()
-
+public data class ListAndSchemeInformationProfile(
+    val type: LoTEType,
+    val statusDeterminationApproach: String,
+    val schemeCommunityRules: List<MultiLanguageURI>,
+    val schemeTerritory: CountryCode,
+    val maxMonthsUntilNextUpdate: Int,
+    val historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>,
+) {
     public companion object {
+
         public operator fun invoke(
             name: String,
             statusDeterminationApproach: String,
             schemeCommunityRules: List<MultiLanguageURI>,
             schemeTerritory: CountryCode,
             maxMonthsUntilNextUpdate: Int,
-            historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>,
+            historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>
+        ) : ListAndSchemeInformationProfile = ListAndSchemeInformationProfile(
+            LoTEType.of(name),
+            statusDeterminationApproach,
+            schemeCommunityRules,
+            schemeTerritory,
+            maxMonthsUntilNextUpdate,
+            historicalInformationPeriod
+        )
+    }
+
+}
+
+public data class TrustedEntitiesProfile(
+    val issuanceServiceTypeIdentifier: URI,
+    val revocationServiceTypeIdentifier: URI,
+)
+
+public interface ListOfTrustedEntitiesProfile {
+    public val listAndSchemeInformation: ListAndSchemeInformationProfile
+    public val trustedEntities: TrustedEntitiesProfile
+
+
+    @Throws(IllegalStateException::class)
+    public fun ListOfTrustedEntities.ensureProfile()
+
+    public companion object {
+        public operator fun invoke(
+            listAndSchemeInformation: ListAndSchemeInformationProfile,
+            trustedEntities: TrustedEntitiesProfile
         ): ListOfTrustedEntitiesProfile =
-            DefaultListOfTrustedEntitiesProfile(
-                name,
-                statusDeterminationApproach,
-                schemeCommunityRules,
-                schemeTerritory,
-                maxMonthsUntilNextUpdate,
-                historicalInformationPeriod,
-            )
+            DefaultListOfTrustedEntitiesProfile(listAndSchemeInformation, trustedEntities)
     }
 }
 
 @Suppress("FunctionName")
 internal fun DefaultListOfTrustedEntitiesProfile(
-    name: String,
-    statusDeterminationApproach: String,
-    schemeCommunityRules: List<MultiLanguageURI>,
-    schemeTerritory: CountryCode,
-    maxMonthsUntilNextUpdate: Int,
-    historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod>,
+    listAndSchemeInformation: ListAndSchemeInformationProfile,
+    trustedEntities: TrustedEntitiesProfile
 ): ListOfTrustedEntitiesProfile =
-    object : ListOfTrustedEntitiesProfile, ListAndSchemeInformationAssertions {
-        public override val type: LoTEType get() = LoTEType.of(name)
-        public override val statusDeterminationApproach: String = statusDeterminationApproach
-        public override val schemeCommunityRules: List<MultiLanguageURI> = schemeCommunityRules
-        public override val schemeTerritory: CountryCode = schemeTerritory
-        public override val maxMonthsUntilNextUpdate: Int = maxMonthsUntilNextUpdate
-        public override val historicalInformationPeriod: ValueRequirement<HistoricalInformationPeriod> =
-            historicalInformationPeriod
-        private val self: ListOfTrustedEntitiesProfile = this
+    object : ListOfTrustedEntitiesProfile, ListAndSchemeInformationAssertions, TrustedEntityAssertions {
+        public override val listAndSchemeInformation: ListAndSchemeInformationProfile
+            get() = listAndSchemeInformation
+        public override val trustedEntities: TrustedEntitiesProfile
+            get() = trustedEntities
 
-        public override fun ListOfTrustedEntities.checkSchemeInformation() =
+
+
+        @Throws(IllegalStateException::class)
+        public override fun ListOfTrustedEntities.ensureProfile() {
+            checkSchemeInformation()
+            checkTrustedEntities()
+        }
+
+        @Throws(IllegalStateException::class)
+        private fun ListOfTrustedEntities.checkSchemeInformation() {
             try {
-                schemeInformation.ensureWalletProvidersScheme(self)
-            } catch (e: IllegalArgumentException) {
-                throw IllegalArgumentException("Violation of $name: ${e.message}")
+                schemeInformation.ensureListAndSchemeInformation(listAndSchemeInformation)
+            } catch (e: IllegalStateException) {
+                throw IllegalStateException("Violation of ${listAndSchemeInformation.type.value}: ${e.message}")
             }
+        }
+
+        @Throws(IllegalStateException::class)
+        private fun ListOfTrustedEntities.checkTrustedEntities() {
+            val trustedEntitiesErrors = mutableMapOf<Int, String>()
+            entities?.forEachIndexed { index, entity ->
+                try {
+                    entity.ensureTrustedEntities(trustedEntities)
+                } catch (e: IllegalStateException) {
+                    trustedEntitiesErrors[index] = e.message ?: "Unknown error"
+                }
+            }
+            if (trustedEntitiesErrors.isNotEmpty()) {
+                throw IllegalStateException("Violation of ${listAndSchemeInformation.type.value}, trusted entities errors: ${trustedEntitiesErrors.map { "${it.key}: ${it.value}" }}")
+            }
+        }
     }
+
+public interface ListOfTrustedEntitiesProfileAndLens : ListOfTrustedEntitiesProfile, EULens
 
 public interface ListAndSchemeInformationAssertions {
-
-    public fun ListAndSchemeInformation.ensureIsExplicit() {
-        checkNotNull(type, ETSI19602.LOTE_TYPE)
-        checkNotNull(schemeOperatorAddress, ETSI19602.SCHEME_OPERATOR_ADDRESS)
-        checkNotNull(schemeName, ETSI19602.SCHEME_NAME)
-        checkNotNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
-        checkNotNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
-        checkNotNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
-        checkNotNull(schemeTerritory, ETSI19602.SCHEME_TERRITORY)
-        checkNotNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
-    }
-
-    public fun ListAndSchemeInformation.ensureIsImplicit() {
-        checkIsNull(schemeName, ETSI19602.SCHEME_NAME)
-        checkIsNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
-        checkIsNull(statusDeterminationApproach, ETSI19602.STATUS_DETERMINATION_APPROACH)
-        checkIsNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
-        checkIsNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
-    }
 
     public fun ListAndSchemeInformation.ensureTypeIs(expected: LoTEType) {
         check(type == expected) {
@@ -152,13 +173,49 @@ public interface ListAndSchemeInformationAssertions {
         }
     }
 
-    public fun ListAndSchemeInformation.ensureWalletProvidersScheme(profile: ListOfTrustedEntitiesProfile) {
+    public fun ListAndSchemeInformation.ensureListAndSchemeInformation(listAndSchemeInformation: ListAndSchemeInformationProfile) {
         ensureIsExplicit()
-        ensureTypeIs(profile.type)
-        ensureStatusDeterminationApproachIs(profile.statusDeterminationApproach)
-        ensureSchemeCommunityRulesIs(profile.schemeCommunityRules)
-        ensureSchemeTerritoryIs(profile.schemeTerritory)
-        ensureHistoricalInformationPeriod(profile.historicalInformationPeriod)
-        ensureNextUpdateIsWithinMonths(profile.maxMonthsUntilNextUpdate)
+        ensureTypeIs(listAndSchemeInformation.type)
+        ensureStatusDeterminationApproachIs(listAndSchemeInformation.statusDeterminationApproach)
+        ensureSchemeCommunityRulesIs(listAndSchemeInformation.schemeCommunityRules)
+        ensureSchemeTerritoryIs(listAndSchemeInformation.schemeTerritory)
+        ensureHistoricalInformationPeriod(listAndSchemeInformation.historicalInformationPeriod)
+        ensureNextUpdateIsWithinMonths(listAndSchemeInformation.maxMonthsUntilNextUpdate)
     }
+}
+
+public interface TrustedEntityAssertions {
+
+    public fun ServiceInformation.ensureServiceTypeIsOneOf(vararg expected: URI) {
+        checkNotNull(typeIdentifier, ETSI19602.SERVICE_TYPE_IDENTIFIER)
+        check(typeIdentifier in expected) {
+            "Invalid ${ETSI19602.SERVICE_TYPE_IDENTIFIER}. Expected one of $expected, got $typeIdentifier"
+        }
+    }
+
+    public fun ServiceInformation.ensureDigitalIdentityContainsX509Certificate() {
+        // We need to check only that x509Certificates is not null.
+        // The ServiceInformation check that if this is not null,
+        checkNotNull(digitalIdentity.x509Certificates, ETSI19602.X509_CERTIFICATES)
+
+    }
+
+    public fun ServiceInformation.ensureServiceStatusIsNotUsed() {
+        checkIsNull(status, ETSI19602.SERVICE_STATUS)
+        checkIsNull(statusStartingTime, ETSI19602.STATUS_STARTING_TIME)
+    }
+
+    public fun TrustedEntity.ensureTrustedEntities(trustedEntities: TrustedEntitiesProfile) {
+        services.forEach { service ->
+            service.information.ensureServiceTypeIsOneOf(
+                trustedEntities.issuanceServiceTypeIdentifier,
+                trustedEntities.revocationServiceTypeIdentifier
+            )
+            service.information.ensureDigitalIdentityContainsX509Certificate()
+            service.information.ensureServiceStatusIsNotUsed()
+        }
+    }
+
+
+    public companion object : TrustedEntityAssertions
 }
