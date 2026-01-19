@@ -54,7 +54,7 @@ class IsChainTrustedJvm(
 
     override suspend fun invoke(
         chain: List<X509Certificate>,
-        signatureVerification: SignatureVerification,
+        signatureVerification: IsChainTrusted.SignatureVerification,
     ): IsChainTrusted.Outcome {
         require(chain.isNotEmpty()) { "Chain must not be empty" }
         val trustAnchors = getTrustAnchorsByVerification(signatureVerification)
@@ -82,7 +82,7 @@ class IsChainTrustedJvm(
 }
 
 fun interface GetTrustAnchorsByVerification {
-    suspend operator fun invoke(signatureVerification: SignatureVerification): Set<TrustAnchor>
+    suspend operator fun invoke(signatureVerification: IsChainTrusted.SignatureVerification): Set<TrustAnchor>
 
     companion object {
         fun usingLoTE(
@@ -93,8 +93,8 @@ fun interface GetTrustAnchorsByVerification {
                 suspend fun EUListOfTrustedEntitiesProfile.getList(): ListOfTrustedEntities =
                     getListByProfile(this).also { it.ensureProfile() }
 
-                val profile = signatureVerification.euProfile
-                val serviceType = signatureVerification.svcType()
+                val profile = signatureVerification.profile
+                val serviceType = signatureVerification.serviceType()
                 val listOfTrustedEntities = profile.getList()
                 val certificates = listOfTrustedEntities.certificatesOf(serviceType)
                 val trustAnchorFactory = createTrustAnchor(profile, serviceType)

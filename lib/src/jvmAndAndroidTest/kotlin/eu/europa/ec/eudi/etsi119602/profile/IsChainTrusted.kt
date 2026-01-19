@@ -16,76 +16,77 @@
 package eu.europa.ec.eudi.etsi119602.profile
 
 import eu.europa.ec.eudi.etsi119602.URI
-import kotlinx.coroutines.flow.first
-import java.security.cert.*
-
-enum class SignatureVerification {
-    EU_WIA,
-    EU_WUA,
-    EU_WUA_STATUS,
-    EU_PID,
-    EU_PID_STATUS,
-    EU_PUB_EAA,
-    EU_PUB_EAA_STATUS,
-    EU_WRPRC,
-    EU_WRPRC_STATUS,
-    EU_WRPAC,
-    EU_WRPAC_STATUS,
-}
-
-val SignatureVerification.euProfile: EUListOfTrustedEntitiesProfile
-    get() = when (this) {
-        SignatureVerification.EU_WIA,
-        SignatureVerification.EU_WUA,
-        SignatureVerification.EU_WUA_STATUS,
-        -> EUWalletProvidersList
-
-        SignatureVerification.EU_PID,
-        SignatureVerification.EU_PID_STATUS,
-        -> EUPIDProvidersList
-
-        SignatureVerification.EU_PUB_EAA,
-        SignatureVerification.EU_PUB_EAA_STATUS,
-        -> EUPubEAAProvidersList
-
-        SignatureVerification.EU_WRPRC,
-        SignatureVerification.EU_WRPRC_STATUS,
-        -> EUWRPRCProvidersList
-
-        SignatureVerification.EU_WRPAC,
-        SignatureVerification.EU_WRPAC_STATUS,
-        -> EUWRPACProvidersList
-    }
-
-fun SignatureVerification.svcType(): URI {
-    val suffix = run {
-        val issuance = "Issuance"
-        val revocation = "Revocation"
-        when (this) {
-            SignatureVerification.EU_WIA -> issuance
-            SignatureVerification.EU_WUA -> issuance
-            SignatureVerification.EU_WUA_STATUS -> revocation
-            SignatureVerification.EU_PID -> issuance
-            SignatureVerification.EU_PID_STATUS -> revocation
-            SignatureVerification.EU_PUB_EAA -> issuance
-            SignatureVerification.EU_PUB_EAA_STATUS -> revocation
-            SignatureVerification.EU_WRPRC -> issuance
-            SignatureVerification.EU_WRPRC_STATUS -> revocation
-            SignatureVerification.EU_WRPAC -> issuance
-            SignatureVerification.EU_WRPAC_STATUS -> revocation
-        }
-    }
-    return euProfile.trustedEntities.serviceTypeIdentifiers.first { it.endsWith(suffix) }
-}
+import java.security.cert.X509Certificate
 
 fun interface IsChainTrusted {
-    suspend operator fun invoke(
-        chain: List<X509Certificate>,
-        signatureVerification: SignatureVerification,
-    ): Outcome
+
+    enum class SignatureVerification {
+        EU_WIA,
+        EU_WUA,
+        EU_WUA_STATUS,
+        EU_PID,
+        EU_PID_STATUS,
+        EU_PUB_EAA,
+        EU_PUB_EAA_STATUS,
+        EU_WRPRC,
+        EU_WRPRC_STATUS,
+        EU_WRPAC,
+        EU_WRPAC_STATUS,
+    }
 
     sealed interface Outcome {
         data object Trusted : Outcome
         data class Untrusted(val cause: Throwable) : Outcome
     }
+
+    suspend operator fun invoke(
+        chain: List<X509Certificate>,
+        signatureVerification: SignatureVerification,
+    ): Outcome
+}
+
+val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
+    get() = when (this) {
+        IsChainTrusted.SignatureVerification.EU_WIA,
+        IsChainTrusted.SignatureVerification.EU_WUA,
+        IsChainTrusted.SignatureVerification.EU_WUA_STATUS,
+        -> EUWalletProvidersList
+
+        IsChainTrusted.SignatureVerification.EU_PID,
+        IsChainTrusted.SignatureVerification.EU_PID_STATUS,
+        -> EUPIDProvidersList
+
+        IsChainTrusted.SignatureVerification.EU_PUB_EAA,
+        IsChainTrusted.SignatureVerification.EU_PUB_EAA_STATUS,
+        -> EUPubEAAProvidersList
+
+        IsChainTrusted.SignatureVerification.EU_WRPRC,
+        IsChainTrusted.SignatureVerification.EU_WRPRC_STATUS,
+        -> EUWRPRCProvidersList
+
+        IsChainTrusted.SignatureVerification.EU_WRPAC,
+        IsChainTrusted.SignatureVerification.EU_WRPAC_STATUS,
+        -> EUWRPACProvidersList
+    }
+
+fun IsChainTrusted.SignatureVerification.serviceType(): URI {
+    val suffix = run {
+        val issuance = "Issuance"
+        val revocation = "Revocation"
+        when (this) {
+            IsChainTrusted.SignatureVerification.EU_WIA -> issuance
+            IsChainTrusted.SignatureVerification.EU_WUA -> issuance
+            IsChainTrusted.SignatureVerification.EU_WUA_STATUS -> revocation
+            IsChainTrusted.SignatureVerification.EU_PID -> issuance
+            IsChainTrusted.SignatureVerification.EU_PID_STATUS -> revocation
+            IsChainTrusted.SignatureVerification.EU_PUB_EAA -> issuance
+            IsChainTrusted.SignatureVerification.EU_PUB_EAA_STATUS -> revocation
+            IsChainTrusted.SignatureVerification.EU_WRPRC -> issuance
+            IsChainTrusted.SignatureVerification.EU_WRPRC_STATUS -> revocation
+            IsChainTrusted.SignatureVerification.EU_WRPAC -> issuance
+            IsChainTrusted.SignatureVerification.EU_WRPAC_STATUS -> revocation
+        }
+    }
+    val result = profile.trustedEntities.serviceTypeIdentifiers.firstOrNull { it.endsWith(suffix) }
+    return checkNotNull(result) { "Unable to find service type for $this with suffix $suffix" }
 }
