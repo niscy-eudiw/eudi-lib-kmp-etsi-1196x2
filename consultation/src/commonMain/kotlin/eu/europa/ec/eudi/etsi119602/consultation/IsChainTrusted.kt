@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.etsi119602.profile
+package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.URI
-import java.security.cert.X509Certificate
+import eu.europa.ec.eudi.etsi119602.profile.*
 
-fun interface IsChainTrusted {
+public fun interface IsChainTrusted<in CHAIN> {
 
-    enum class SignatureVerification {
+    public enum class SignatureVerification {
         EU_WIA,
         EU_WUA,
         EU_WUA_STATUS,
@@ -36,18 +36,18 @@ fun interface IsChainTrusted {
         EU_MDL_STATUS,
     }
 
-    sealed interface Outcome {
-        data object Trusted : Outcome
-        data class Untrusted(val cause: Throwable) : Outcome
+    public sealed interface Outcome {
+        public data object Trusted : Outcome
+        public data class Untrusted(val cause: Throwable) : Outcome
     }
 
-    suspend operator fun invoke(
-        chain: List<X509Certificate>,
+    public suspend operator fun invoke(
+        chain: CHAIN,
         signatureVerification: SignatureVerification,
     ): Outcome
 }
 
-val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
+public val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
     get() = when (this) {
         IsChainTrusted.SignatureVerification.EU_WIA,
         IsChainTrusted.SignatureVerification.EU_WUA,
@@ -75,7 +75,7 @@ val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
         -> EUMDLProvidersList
     }
 
-fun IsChainTrusted.SignatureVerification.serviceType(): URI {
+public fun IsChainTrusted.SignatureVerification.serviceType(): URI {
     val suffix = run {
         val issuance = "Issuance"
         val revocation = "Revocation"

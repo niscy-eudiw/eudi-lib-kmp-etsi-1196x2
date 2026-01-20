@@ -35,4 +35,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "eudi-lib-kmp-etsi-119602"
 include(":eudi-lib-kmp-etsi-119602-data-model")
+include(":eudi-lib-kmp-etsi-119602-consultation")
 project(":eudi-lib-kmp-etsi-119602-data-model").projectDir = file("data-model")
+project(":eudi-lib-kmp-etsi-119602-consultation").projectDir = file("consultation")

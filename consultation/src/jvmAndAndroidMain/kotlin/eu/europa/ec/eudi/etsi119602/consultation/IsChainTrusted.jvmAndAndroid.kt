@@ -13,9 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.etsi119602.profile
+package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.*
+import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
+import eu.europa.ec.eudi.etsi119602.URI
+import eu.europa.ec.eudi.etsi119602.certificatesOf
+import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
 import java.security.InvalidAlgorithmParameterException
 import java.security.Provider
 import java.security.cert.*
@@ -24,14 +27,15 @@ import java.security.cert.*
 // JVM Implementation
 //
 
-class IsChainTrustedJvm(
+public class IsChainTrustedJvm
+internal constructor(
     private val certificateFactory: () -> CertificateFactory,
     private val certPathValidator: () -> CertPathValidator,
     private val getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
     private val customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
-) : IsChainTrusted {
+) : IsChainTrusted<List<X509Certificate>> {
 
-    constructor(
+    public constructor(
         getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
         customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
     ) : this(
@@ -41,7 +45,7 @@ class IsChainTrustedJvm(
         customization,
     )
 
-    constructor(
+    public constructor(
         provider: Provider,
         getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
         customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
@@ -74,25 +78,25 @@ class IsChainTrustedJvm(
             IsChainTrusted.Outcome.Untrusted(e)
         }
 
-    companion object {
-        val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = { isRevocationEnabled = false }
+    public companion object {
+        internal val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = { isRevocationEnabled = false }
         private const val X_509 = "X.509"
         private const val PKIX = "PKIX"
     }
 }
 
-fun interface GetTrustAnchorsByVerification {
-    suspend operator fun invoke(signatureVerification: IsChainTrusted.SignatureVerification): Set<TrustAnchor>
+public fun interface GetTrustAnchorsByVerification {
+    public suspend operator fun invoke(signatureVerification: IsChainTrusted.SignatureVerification): Set<TrustAnchor>
 
-    operator fun plus(other: GetTrustAnchorsByVerification): GetTrustAnchorsByVerification =
+    public operator fun plus(other: GetTrustAnchorsByVerification): GetTrustAnchorsByVerification =
         GetTrustAnchorsByVerification { signatureVerification ->
             this.invoke(signatureVerification) + other.invoke(signatureVerification)
         }
 
-    companion object {
-        fun usingLoTE(
+    public companion object {
+        public fun usingLoTE(
             getListByProfile: GetListByProfile,
-            createTrustAnchor: CreateTrustAnchor = CreateTrustAnchor.Default,
+            createTrustAnchor: CreateTrustAnchor = CreateTrustAnchor.WITH_NO_NAME_CONSTRAINTS,
         ): GetTrustAnchorsByVerification =
             GetTrustAnchorsByVerification { signatureVerification ->
                 suspend fun EUListOfTrustedEntitiesProfile.getList(): ListOfTrustedEntities =
@@ -108,26 +112,14 @@ fun interface GetTrustAnchorsByVerification {
     }
 }
 
-fun interface CreateTrustAnchor {
-    operator fun invoke(profile: EUListOfTrustedEntitiesProfile, serviceType: URI): (X509Certificate) -> TrustAnchor
+public fun interface CreateTrustAnchor {
+    public operator fun invoke(profile: EUListOfTrustedEntitiesProfile, serviceType: URI): (X509Certificate) -> TrustAnchor
 
-    companion object {
-        val Default: CreateTrustAnchor = CreateTrustAnchor { _, _ -> { TrustAnchor(it, null) } }
+    public companion object {
+        public val WITH_NO_NAME_CONSTRAINTS: CreateTrustAnchor = CreateTrustAnchor { _, _ -> { TrustAnchor(it, null) } }
     }
 }
 
-fun interface GetListByProfile {
-    suspend operator fun invoke(loteType: URI): ListOfTrustedEntities
+public fun interface GetListByProfile {
+    public suspend operator fun invoke(loteType: URI): ListOfTrustedEntities
 }
-
-data class LoTERemoteRegistry(
-    val locations: Map<LoTEType, Pair<URI, X509Certificate>>,
-)
-
-data class LoteRepoEntity(
-    val loteType: LoTEType,
-    val version: Int,
-    val content: String,
-    val listIssueDateTime: LoTEDateTime,
-    val nextUpdate: LoTEDateTime,
-)

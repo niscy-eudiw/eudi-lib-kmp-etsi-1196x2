@@ -81,10 +81,7 @@ kotlin {
         commonMain {
             dependencies {
                 // Common dependencies
-                api(libs.kotlinx.serialization.core)
-                api(libs.kotlinx.serialization.json)
-                api(libs.kotlinx.coroutines.core)
-                api(libs.kotlinx.datetime)
+                api(projects.eudiLibKmpEtsi119602DataModel)
             }
         }
 
@@ -196,7 +193,7 @@ mavenPublishing {
 
     coordinates(
         groupId = group.toString(),
-        artifactId = "eudi-lib-kmp-etsi-119602-data-model",
+        artifactId = "eudi-lib-kmp-etsi-119602-consultation",
         version = version.toString(),
     )
 

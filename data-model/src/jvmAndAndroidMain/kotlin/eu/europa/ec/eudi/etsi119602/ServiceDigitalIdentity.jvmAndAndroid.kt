@@ -31,49 +31,7 @@ public fun PKIObject.x509Certificate(provider: String? = null): X509Certificate 
 public fun PKIObject.x509Certificate(provider: Provider): X509Certificate =
     CertificateFactory.getInstance(X_509, provider).x509CertificateOf(this)
 
-private fun CertificateFactory.x509CertificateOf(pkiOb: PKIObject): X509Certificate =
+public fun CertificateFactory.x509CertificateOf(pkiOb: PKIObject): X509Certificate =
     generateCertificate(pkiOb.value.inputStream()) as X509Certificate
 
 private const val X_509 = "X.509"
-private const val PKIX = "PKIX"
-
-public class IsTrustAnchorOfChain private constructor(
-    private val chain: List<X509Certificate>,
-    private val certificateFactory: CertificateFactory,
-    private val certPathValidator: CertPathValidator,
-) : suspend (ServiceDigitalIdentity) -> Boolean {
-    public constructor(chain: List<X509Certificate>) : this(
-        chain,
-        CertificateFactory.getInstance(X_509),
-        CertPathValidator.getInstance(PKIX),
-    )
-
-    public constructor(chain: List<X509Certificate>, provider: String) : this(
-        chain,
-        CertificateFactory.getInstance(X_509, provider),
-        CertPathValidator.getInstance(PKIX, provider),
-    )
-
-    public constructor(chain: List<X509Certificate>, provider: Provider) : this(
-        chain,
-        CertificateFactory.getInstance(X_509, provider),
-        CertPathValidator.getInstance(PKIX, provider),
-    )
-
-    override suspend operator fun invoke(serviceDigitalIdentity: ServiceDigitalIdentity): Boolean {
-        val certPath = certificateFactory.generateCertPath(chain)
-        val pkixParameters = run {
-            val anchors =
-                serviceDigitalIdentity.x509Certificates.orEmpty().map { pkiObj ->
-                    val anchorCert = certificateFactory.x509CertificateOf(pkiObj)
-                    TrustAnchor(anchorCert, null)
-                }
-            PKIXParameters(anchors.toSet())
-        }
-        return try {
-            certPathValidator.validate(certPath, pkixParameters) != null
-        } catch (_: Throwable) {
-            false
-        }
-    }
-}
