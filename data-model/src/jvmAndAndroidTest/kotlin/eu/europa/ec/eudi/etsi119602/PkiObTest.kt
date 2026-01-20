@@ -39,7 +39,7 @@ class PkiObTest {
         DIGIT.fetchLists().collect { (profile, jwt) ->
             println("\n\n\n====== ${profile.listAndSchemeInformation.type} ======")
             val lote = JwtUtil.loteOfJwt(jwt)
-            with(profile) { lote.ensureProfile() }
+            with(profile) { lote.ensureCompliesToProfile() }
             val certs = lote.entities.orEmpty()
                 .flatMap { it.services }
                 .flatMap { it.information.digitalIdentity.x509Certificates.orEmpty() }

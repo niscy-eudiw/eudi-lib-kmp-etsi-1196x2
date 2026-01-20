@@ -96,7 +96,7 @@ fun interface GetTrustAnchorsByVerification {
         ): GetTrustAnchorsByVerification =
             GetTrustAnchorsByVerification { signatureVerification ->
                 suspend fun EUListOfTrustedEntitiesProfile.getList(): ListOfTrustedEntities =
-                    getListByProfile(this.listAndSchemeInformation.type).also { it.ensureProfile() }
+                    getListByProfile(this.listAndSchemeInformation.type).also { it.ensureCompliesToProfile() }
 
                 val profile = signatureVerification.profile
                 val serviceType = signatureVerification.serviceType()

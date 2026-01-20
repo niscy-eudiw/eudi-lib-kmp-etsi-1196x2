@@ -35,6 +35,7 @@ import kotlin.time.ExperimentalTime
 @Serializable
 public data class ListAndSchemeInformation
 @OptIn(ExperimentalTime::class)
+@Throws(IllegalArgumentException::class)
 internal constructor(
     /**
      * The value of this integer shall be incremented only when the rules for parsing the LoTE
@@ -88,6 +89,19 @@ internal constructor(
         requireNullOrNonEmpty(schemeExtensions, ETSI19602.SCHEME_EXTENSIONS)
     }
 
+    /**
+     * Ensures that the list and scheme information is explicit.
+     * The following attributes are mandatory:
+     * - type
+     * - schemeOperatorAddress
+     * - schemeName
+     * - schemeInformationURI
+     * - statusDeterminationApproach
+     * - schemeTerritory
+     * - policyOrLegalNotice
+     * @throws IllegalStateException if any required field is missing
+     */
+    @Throws(IllegalStateException::class)
     public fun ensureIsExplicit() {
         checkNotNull(type, ETSI19602.LOTE_TYPE)
         checkNotNull(schemeOperatorAddress, ETSI19602.SCHEME_OPERATOR_ADDRESS)
@@ -99,6 +113,17 @@ internal constructor(
         checkNotNull(policyOrLegalNotice, ETSI19602.POLICY_OR_LEGAL_NOTICE)
     }
 
+    /**
+     * Ensures that the list and scheme information is implicit.
+     * The following attributes must not be present:
+     * - schemeName
+     * - schemeInformationURI
+     * - statusDeterminationApproach
+     * - schemeTypeCommunityRules
+     * - policyOrLegalNotice
+     * @throws IllegalStateException if any of the above attributes is present
+     */
+    @Throws(IllegalStateException::class)
     public fun ensureIsImplicit() {
         checkIsNull(schemeName, ETSI19602.SCHEME_NAME)
         checkIsNull(schemeInformationURI, ETSI19602.SCHEME_INFORMATION_URI)
@@ -108,7 +133,11 @@ internal constructor(
     }
 
     public companion object {
+        /**
+         * Factory method for creating an implicit list
+         */
         @OptIn(ExperimentalTime::class)
+        @Throws(IllegalArgumentException::class)
         public fun implicit(
             sequenceNumber: Int = ETSI19602.INITIAL_SEQUENCE_NUMBER,
             type: URI? = null,
@@ -142,7 +171,12 @@ internal constructor(
                 schemeExtensions = schemeExtensions,
             )
 
+        /**
+         * Factory method for creating an explicit list
+         * @throws IllegalArgumentException
+         */
         @OptIn(ExperimentalTime::class)
+        @Throws(IllegalArgumentException::class)
         public fun explicit(
             sequenceNumber: Int = ETSI19602.INITIAL_SEQUENCE_NUMBER,
             type: URI,
@@ -249,7 +283,7 @@ public value class HistoricalInformationPeriod(
 
 @Serializable
 public data class OtherLoTEPointer(
-    @SerialName(ETSI19602.LOTE_LOCATION) @Required val location: String, // URI
+    @SerialName(ETSI19602.LOTE_LOCATION) @Required val location: URI, // URI
     @SerialName(ETSI19602.SERVICE_DIGITAL_IDENTITIES) @Required val serviceDigitalIdentities: List<ServiceDigitalIdentity>,
     @SerialName(ETSI19602.LOTE_QUALIFIERS) @Required val qualifiers: List<LoTEQualifier>,
 ) {

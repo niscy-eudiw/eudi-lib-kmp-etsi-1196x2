@@ -26,7 +26,7 @@ class ListOfTrustedEntitiesTest {
         DIGIT.fetchLists().map { (profile, jwt) ->
             profile to JwtUtil.loteOfJwt(jwt)
         }.collect { (profile, lote) ->
-            with(profile) { lote.ensureProfile() }
+            with(profile) { lote.ensureCompliesToProfile() }
         }
     }
 }
