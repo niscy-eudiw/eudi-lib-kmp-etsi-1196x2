@@ -15,15 +15,12 @@
  */
 package eu.europa.ec.eudi.etsi119602.profile
 
-import eu.europa.ec.eudi.etsi119602.CountryCode
-import eu.europa.ec.eudi.etsi119602.ETSI19602
-import eu.europa.ec.eudi.etsi119602.LoTEType
-import eu.europa.ec.eudi.etsi119602.MultiLanguageURI
-import eu.europa.ec.eudi.etsi119602.URIValue
+import eu.europa.ec.eudi.etsi119602.*
 
 public val EUWRPRCProvidersList: EUListOfTrustedEntitiesProfile =
     EUListOfTrustedEntitiesProfile(
-        listAndSchemeInformation = ListAndSchemeInformationProfile(
+        listAndSchemeInformation =
+        EUListAndSchemeInformationProfile(
             type = LoTEType.of(ETSI19602.EU_WRPRC_PROVIDERS_LOTE),
             statusDeterminationApproach = ETSI19602.EU_WRPRC_PROVIDERS_STATUS_DETERMINATION_APPROACH,
             schemeCommunityRules = listOf(

@@ -24,7 +24,7 @@ import eu.europa.ec.eudi.etsi119602.URIValue
 public val EUWRPACProvidersList: EUListOfTrustedEntitiesProfile =
     EUListOfTrustedEntitiesProfile(
         listAndSchemeInformation =
-        ListAndSchemeInformationProfile(
+        EUListAndSchemeInformationProfile(
             type = LoTEType.of(ETSI19602.EU_WRPAC_PROVIDERS_LOTE),
             statusDeterminationApproach = ETSI19602.EU_WRPAC_PROVIDERS_STATUS_DETERMINATION_APPROACH,
             schemeCommunityRules = listOf(

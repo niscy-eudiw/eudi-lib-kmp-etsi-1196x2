@@ -20,7 +20,6 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 
 @Serializable
 public data class TrustedEntity
@@ -101,7 +100,7 @@ public constructor(
     @SerialName(ETSI19602.SCHEME_SERVICE_DEFINITION_URI) val schemeServiceDefinitionURI: List<MultiLanguageURI>? = null,
     @SerialName(ETSI19602.SERVICE_SUPPLY_POINTS) val supplyPoints: List<ServiceSupplyPointURI>? = null,
     @SerialName(ETSI19602.SERVICE_DEFINITION_URI) val definitionURI: List<MultiLanguageURI>? = null,
-    @SerialName(ETSI19602.SERVICE_INFORMATION_EXTENSIONS) val informationExtensions: JsonArray? = null,
+    @SerialName(ETSI19602.SERVICE_INFORMATION_EXTENSIONS) val informationExtensions: ServiceInformationExtensions? = null,
 ) {
     init {
         with(Assertions) {
@@ -114,8 +113,27 @@ public constructor(
     }
 }
 
-// TODO Define the explicit data model of ServiceHistoryInstance
-public typealias ServiceHistoryInstance = JsonObject
+@Serializable
+public data class ServiceHistoryInstance
+@Throws(IllegalArgumentException::class)
+public constructor(
+    @SerialName(ETSI19602.SERVICE_NAME) @Required val name: List<MultilanguageString>,
+    @SerialName(ETSI19602.SERVICE_DIGITAL_IDENTITY) @Required val digitalIdentity: ServiceDigitalIdentity,
+    @SerialName(ETSI19602.SERVICE_STATUS) @Required val status: URI,
+    @SerialName(ETSI19602.STATUS_STARTING_TIME) @Required val statusStartingTime: LoTEDateTime,
+    @SerialName(ETSI19602.SERVICE_TYPE_IDENTIFIER) val typeIdentifier: URI? = null,
+    @SerialName(ETSI19602.SERVICE_INFORMATION_EXTENSIONS) val informationExtensions: ServiceInformationExtensions? = null,
+) {
+    init {
+        with(Assertions) {
+            requireNonEmpty(name, ETSI19602.SERVICE_NAME)
+            requireNullOrNonEmpty(informationExtensions, ETSI19602.SERVICE_INFORMATION_EXTENSIONS)
+        }
+    }
+}
+
+// TODO Provide an explicit data model for ServiceInformationExtensions
+public typealias ServiceInformationExtensions = JsonArray
 
 @Serializable
 public data class ServiceSupplyPointURI

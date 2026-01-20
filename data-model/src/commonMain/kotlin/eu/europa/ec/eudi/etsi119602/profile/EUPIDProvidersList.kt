@@ -28,7 +28,7 @@ import eu.europa.ec.eudi.etsi119602.URIValue
 public val EUPIDProvidersList: EUListOfTrustedEntitiesProfile =
     EUListOfTrustedEntitiesProfile(
         listAndSchemeInformation =
-        ListAndSchemeInformationProfile(
+        EUListAndSchemeInformationProfile(
             type = LoTEType.of(ETSI19602.EU_PID_PROVIDERS_LOTE),
             statusDeterminationApproach = ETSI19602.EU_PID_PROVIDERS_STATUS_DETERMINATION_APPROACH,
             schemeCommunityRules = listOf(MultiLanguageURI.en(URIValue(ETSI19602.EU_PID_PROVIDERS_SCHEME_COMMUNITY_RULES))),

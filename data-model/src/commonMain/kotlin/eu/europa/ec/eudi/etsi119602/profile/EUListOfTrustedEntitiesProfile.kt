@@ -33,7 +33,7 @@ public data class EUListOfTrustedEntitiesProfile(
     /**
      * Scheme and information expectations
      */
-    val listAndSchemeInformation: ListAndSchemeInformationProfile,
+    val listAndSchemeInformation: EUListAndSchemeInformationProfile,
 
     /**
      * Trusted entities expectations
@@ -88,7 +88,7 @@ public sealed interface ValueRequirement<out T> {
 /**
  * Expectations about the scheme of an EU-specific LoTE
  */
-public data class ListAndSchemeInformationProfile(
+public data class EUListAndSchemeInformationProfile(
     /**
      * The type of the list of trusted entities.
      */
@@ -226,7 +226,7 @@ internal interface ListAndSchemeInformationAssertions {
      * @throws IllegalStateException if the list of trusted entities does not comply to the expected profile
      */
     @Throws(IllegalStateException::class)
-    fun ListAndSchemeInformation.ensureCompliesTo(listAndSchemeInformation: ListAndSchemeInformationProfile) {
+    fun ListAndSchemeInformation.ensureCompliesTo(listAndSchemeInformation: EUListAndSchemeInformationProfile) {
         ensureIsExplicit()
         ensureTypeIs(listAndSchemeInformation.type)
         ensureStatusDeterminationApproachIs(listAndSchemeInformation.statusDeterminationApproach)
@@ -251,7 +251,15 @@ internal interface TrustedEntityAssertions {
      * @throws IllegalStateException if the service type identifier is not any of the expected service types
      */
     @Throws(IllegalStateException::class)
-    fun ServiceInformation.ensureServiceTypeIsAnyOf(expectedServiceTypes: Set<URI>) {
+    fun ServiceInformation.ensureServiceTypeIsAnyOf(expectedServiceTypes: Set<URI>) =
+        ensureServiceTypeIsAnyOf(typeIdentifier, expectedServiceTypes)
+
+    @Throws(IllegalStateException::class)
+    fun ServiceHistoryInstance.ensureServiceTypeIsAnyOf(expectedServiceTypes: Set<URI>) =
+        ensureServiceTypeIsAnyOf(typeIdentifier, expectedServiceTypes)
+
+    @Throws(IllegalStateException::class)
+    private fun ensureServiceTypeIsAnyOf(typeIdentifier: URI?, expectedServiceTypes: Set<URI>) {
         Assertions.checkNotNull(typeIdentifier, ETSI19602.SERVICE_TYPE_IDENTIFIER)
         check(typeIdentifier in expectedServiceTypes) {
             "Invalid ${ETSI19602.SERVICE_TYPE_IDENTIFIER}. Expected one of $expectedServiceTypes, got $typeIdentifier"
@@ -266,6 +274,16 @@ internal interface TrustedEntityAssertions {
      */
     @Throws(IllegalStateException::class)
     fun ServiceInformation.ensureDigitalIdentityContainsX509Certificate(mustContainX509Certificates: Boolean) {
+        ensureDigitalIdentityContainsX509Certificate(digitalIdentity, mustContainX509Certificates)
+    }
+
+    @Throws(IllegalStateException::class)
+    fun ServiceHistoryInstance.ensureDigitalIdentityContainsX509Certificate(mustContainX509Certificates: Boolean) {
+        ensureDigitalIdentityContainsX509Certificate(digitalIdentity, mustContainX509Certificates)
+    }
+
+    @Throws(IllegalStateException::class)
+    fun ensureDigitalIdentityContainsX509Certificate(digitalIdentity: ServiceDigitalIdentity, mustContainX509Certificates: Boolean) {
         if (mustContainX509Certificates) {
             // We need to check only that x509Certificates is not null.
             // The ServiceInformation check that if this is not null,
@@ -306,8 +324,19 @@ internal interface TrustedEntityAssertions {
     }
 
     @Throws(IllegalStateException::class)
+    fun ServiceHistoryInstance.ensureCompliesTo(trustedEntities: EUTrustedEntitiesProfile) {
+        ensureServiceTypeIsAnyOf(trustedEntities.serviceTypeIdentifiers)
+        ensureDigitalIdentityContainsX509Certificate(trustedEntities.mustContainX509Certificates)
+    }
+
+    @Throws(IllegalStateException::class)
     fun TrustedEntity.ensureTrustedEntities(trustedEntities: EUTrustedEntitiesProfile) {
-        services.forEach { service -> service.information.ensureCompliesTo(trustedEntities) }
+        services.forEach { service ->
+            service.information.ensureCompliesTo(trustedEntities)
+            service.history.orEmpty().forEach { historyInstance ->
+                historyInstance.ensureCompliesTo(trustedEntities)
+            }
+        }
     }
 
     companion object : TrustedEntityAssertions
