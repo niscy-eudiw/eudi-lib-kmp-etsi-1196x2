@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.etsi119602
 
 import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
+import eu.europa.ec.eudi.etsi119602.profile.EUMDLProvidersList
 import eu.europa.ec.eudi.etsi119602.profile.EUPIDProvidersList
 import eu.europa.ec.eudi.etsi119602.profile.EUWRPACProvidersList
 import eu.europa.ec.eudi.etsi119602.profile.EUWalletProvidersList
@@ -32,16 +33,18 @@ import kotlinx.serialization.json.Json
 
 object DIGIT {
 
-    private const val EU_PID_PROVIDERS = "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json"
-    private const val EU_WALLET_PROVIDERS =
+    private const val EU_PID_PROVIDERS_URL = "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/pid-providers.json"
+    private const val EU_WALLET_PROVIDERS_URL =
         "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wallet-providers.json"
-    private const val EU_WRPAC_PROVIDERS = "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json"
+    private const val EU_WRPAC_PROVIDERS_URL = "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/wrpac-providers.json"
+    private const val EU_MDL_PROVIDERS_URL = "https://acceptance.trust.tech.ec.europa.eu/lists/eudiw/mdl-providers.json"
 
     val LISTS: Map<EUListOfTrustedEntitiesProfile, String> by lazy {
         mapOf(
-            EUPIDProvidersList to EU_PID_PROVIDERS,
-            EUWalletProvidersList to EU_WALLET_PROVIDERS,
-            EUWRPACProvidersList to EU_WRPAC_PROVIDERS,
+            EUPIDProvidersList to EU_PID_PROVIDERS_URL,
+            EUWalletProvidersList to EU_WALLET_PROVIDERS_URL,
+            EUWRPACProvidersList to EU_WRPAC_PROVIDERS_URL,
+            EUMDLProvidersList to EU_MDL_PROVIDERS_URL,
         )
     }
 

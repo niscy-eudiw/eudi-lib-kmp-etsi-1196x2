@@ -32,6 +32,8 @@ fun interface IsChainTrusted {
         EU_WRPRC_STATUS,
         EU_WRPAC,
         EU_WRPAC_STATUS,
+        EU_MDL,
+        EU_MDL_STATUS,
     }
 
     sealed interface Outcome {
@@ -67,6 +69,10 @@ val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
         IsChainTrusted.SignatureVerification.EU_WRPAC,
         IsChainTrusted.SignatureVerification.EU_WRPAC_STATUS,
         -> EUWRPACProvidersList
+
+        IsChainTrusted.SignatureVerification.EU_MDL,
+        IsChainTrusted.SignatureVerification.EU_MDL_STATUS,
+        -> EUMDLProvidersList
     }
 
 fun IsChainTrusted.SignatureVerification.serviceType(): URI {
@@ -85,6 +91,8 @@ fun IsChainTrusted.SignatureVerification.serviceType(): URI {
             IsChainTrusted.SignatureVerification.EU_WRPRC_STATUS -> revocation
             IsChainTrusted.SignatureVerification.EU_WRPAC -> issuance
             IsChainTrusted.SignatureVerification.EU_WRPAC_STATUS -> revocation
+            IsChainTrusted.SignatureVerification.EU_MDL -> issuance
+            IsChainTrusted.SignatureVerification.EU_MDL_STATUS -> revocation
         }
     }
     val result = profile.trustedEntities.serviceTypeIdentifiers.firstOrNull { it.endsWith(suffix) }
