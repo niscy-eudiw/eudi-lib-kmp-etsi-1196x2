@@ -17,44 +17,25 @@ package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.ServiceDigitalIdentity
 import eu.europa.ec.eudi.etsi119602.x509CertificateOf
-import java.security.Provider
-import java.security.cert.CertPathValidator
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 
 public class IsTrustAnchorOfChain private constructor(
-    private val certificateFactory: () -> CertificateFactory,
-    private val certPathValidator: () -> CertPathValidator,
+    private val validateCertificateChain: ValidateCertificateChainJvm,
     private val chain: List<X509Certificate>,
 ) {
 
-    public constructor(chain: List<X509Certificate>) : this(
-        ValidateCertificateChainJvm.X509_CERT_FACTORY,
-        ValidateCertificateChainJvm.PKIX_CERT_VALIDATOR,
-        chain,
-    )
-
-    public constructor(chain: List<X509Certificate>, provider: Provider) : this(
-        ValidateCertificateChainJvm.x509CertFactory(provider),
-        ValidateCertificateChainJvm.pkixCertValidator(provider),
-        chain,
-    )
+    private val certificateFactory: CertificateFactory
+        get() = validateCertificateChain.certificateFactory
 
     public suspend operator fun invoke(value: ServiceDigitalIdentity): Boolean {
-        val crtFactory = certificateFactory()
-        val anchors =
+        val trustAnchors =
             value.x509Certificates.orEmpty().map { pkiObj ->
-                val anchorCert = crtFactory.x509CertificateOf(pkiObj)
+                val anchorCert = certificateFactory.x509CertificateOf(pkiObj)
                 TrustAnchor(anchorCert, null)
             }.toSet()
-        val validateCertificateChain = ValidateCertificateChainJvm(
-            { crtFactory },
-            certPathValidator,
-            anchors.toSet(),
-            customization = ValidateCertificateChainJvm.revocationEnabled(false),
-        )
-        return when (validateCertificateChain(chain)) {
+        return when (validateCertificateChain(chain, trustAnchors)) {
             ValidateCertificateChain.Outcome.Trusted -> true
             is ValidateCertificateChain.Outcome.Untrusted -> false
         }

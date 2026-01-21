@@ -18,54 +18,25 @@ package eu.europa.ec.eudi.etsi119602.consultation
 import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
 import eu.europa.ec.eudi.etsi119602.URI
 import eu.europa.ec.eudi.etsi119602.certificatesOf
-import eu.europa.ec.eudi.etsi119602.consultation.ValidateCertificateChainJvm.Companion.DEFAULT_CUSTOMIZATION
 import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
-import java.security.Provider
-import java.security.cert.*
+import java.security.cert.TrustAnchor
+import java.security.cert.X509Certificate
 
 //
 // JVM Implementation
 //
 
-public class IsChainTrustedJvm
-internal constructor(
-    private val certificateFactory: () -> CertificateFactory,
-    private val certPathValidator: () -> CertPathValidator,
+public class IsChainTrustedJvm(
+    private val validateCertificateChain: ValidateCertificateChainJvm,
     private val getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
-    private val customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
 ) : IsChainTrusted<List<X509Certificate>> {
-
-    public constructor(
-        getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
-        customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
-    ) : this(
-        ValidateCertificateChainJvm.X509_CERT_FACTORY,
-        ValidateCertificateChainJvm.PKIX_CERT_VALIDATOR,
-        getTrustAnchorsByVerification,
-        customization,
-    )
-
-    public constructor(
-        provider: Provider,
-        getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
-        customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
-    ) : this(
-        ValidateCertificateChainJvm.x509CertFactory(provider),
-        ValidateCertificateChainJvm.pkixCertValidator(provider),
-        getTrustAnchorsByVerification,
-        customization,
-    )
 
     override suspend fun invoke(
         chain: List<X509Certificate>,
         signatureVerification: IsChainTrusted.SignatureVerification,
     ): ValidateCertificateChain.Outcome {
         val trustAnchors = getTrustAnchorsByVerification(signatureVerification)
-        val validateCertificate = ValidateCertificateChainJvm(certificateFactory, certPathValidator, trustAnchors, customization)
-        return validateCertificate(chain)
-    }
-
-    public companion object {
+        return validateCertificateChain(chain, trustAnchors)
     }
 }
 
@@ -97,7 +68,10 @@ public fun interface GetTrustAnchorsByVerification {
 }
 
 public fun interface CreateTrustAnchor {
-    public operator fun invoke(profile: EUListOfTrustedEntitiesProfile, serviceType: URI): (X509Certificate) -> TrustAnchor
+    public operator fun invoke(
+        profile: EUListOfTrustedEntitiesProfile,
+        serviceType: URI,
+    ): (X509Certificate) -> TrustAnchor
 
     public companion object {
         public val WITH_NO_NAME_CONSTRAINTS: CreateTrustAnchor = CreateTrustAnchor { _, _ -> { TrustAnchor(it, null) } }

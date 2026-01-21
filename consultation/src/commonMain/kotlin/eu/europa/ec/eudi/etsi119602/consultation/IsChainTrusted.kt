@@ -18,6 +18,12 @@ package eu.europa.ec.eudi.etsi119602.consultation
 import eu.europa.ec.eudi.etsi119602.URI
 import eu.europa.ec.eudi.etsi119602.profile.*
 
+/**
+ * Interface for checking the trustworthiness of a certificate chain
+ * in the context of a specific [verification][SignatureVerification]
+ *
+ * @param CHAIN type representing a certificate chain
+ */
 public fun interface IsChainTrusted<in CHAIN : Any> {
 
     public enum class SignatureVerification {
@@ -100,6 +106,13 @@ public fun interface IsChainTrusted<in CHAIN : Any> {
         EU_MDL_STATUS,
     }
 
+    /**
+     * Check certificate chain is trusted in the context of
+     * specific verification
+     *
+     * @param chain certificate chain to check
+     * @param signatureVerification verification context
+     */
     public suspend operator fun invoke(
         chain: CHAIN,
         signatureVerification: SignatureVerification,
@@ -109,6 +122,9 @@ public fun interface IsChainTrusted<in CHAIN : Any> {
 public inline fun <C : Any, C1 : Any> IsChainTrusted<C>.contraMap(crossinline f: (C1) -> C): IsChainTrusted<C1> =
     IsChainTrusted { c1, sv -> invoke(f(c1), sv) }
 
+/**
+ * Associate a List of Trusted Entities Profile with a verification context
+ */
 public val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
     get() = when (this) {
         IsChainTrusted.SignatureVerification.EU_WIA,
@@ -137,6 +153,9 @@ public val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntities
         -> EUMDLProvidersList
     }
 
+/**
+ * Associate a Service Type Identifier with a verification context
+ */
 public fun IsChainTrusted.SignatureVerification.serviceType(): URI {
     val suffix = run {
         val issuance = "Issuance"

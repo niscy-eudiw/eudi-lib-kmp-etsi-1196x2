@@ -19,22 +19,25 @@ import java.security.InvalidAlgorithmParameterException
 import java.security.Provider
 import java.security.cert.*
 
+/**
+ * A JVM-specific implementation of [ValidateCertificateChain]
+ */
 public class ValidateCertificateChainJvm(
-    private val certificateFactory: () -> CertificateFactory,
-    private val certPathValidator: () -> CertPathValidator,
-    private val trustAnchors: Set<TrustAnchor>,
+    public val certificateFactory: CertificateFactory,
+    private val certPathValidator: CertPathValidator,
     private val customization: PKIXParameters.() -> Unit,
-) : ValidateCertificateChain<List<X509Certificate>> {
+) : ValidateCertificateChain<List<X509Certificate>, TrustAnchor> {
 
-    override suspend fun invoke(chain: List<X509Certificate>): ValidateCertificateChain.Outcome {
+    override suspend fun invoke(
+        chain: List<X509Certificate>,
+        trustAnchors: Set<TrustAnchor>,
+    ): ValidateCertificateChain.Outcome {
         require(chain.isNotEmpty()) { "Chain must not be empty" }
-        val certFactory = certificateFactory()
-        val validator = certPathValidator()
         return try {
             val pkixParameters =
                 PKIXParameters(trustAnchors).apply(customization)
-            val certPath = certFactory.generateCertPath(chain)
-            validator.validate(certPath, pkixParameters)
+            val certPath = certificateFactory.generateCertPath(chain)
+            certPathValidator.validate(certPath, pkixParameters)
             ValidateCertificateChain.Outcome.Trusted
         } catch (e: CertPathValidatorException) {
             ValidateCertificateChain.Outcome.Untrusted(e)
@@ -45,13 +48,15 @@ public class ValidateCertificateChainJvm(
 
     public companion object {
         private const val X_509 = "X.509"
-        public val X509_CERT_FACTORY: () -> CertificateFactory = { CertificateFactory.getInstance(X_509) }
-        public val PKIX_CERT_VALIDATOR: () -> CertPathValidator = { CertPathValidator.getInstance(PKIX) }
-        public fun x509CertFactory(provider: Provider): () -> CertificateFactory = { CertificateFactory.getInstance(X_509, provider) }
+        public val X509_CERT_FACTORY: CertificateFactory get() = CertificateFactory.getInstance(X_509)
+        public val PKIX_CERT_VALIDATOR: CertPathValidator get() = CertPathValidator.getInstance(PKIX)
+        public fun x509CertFactory(provider: Provider): CertificateFactory =
+            CertificateFactory.getInstance(X_509, provider)
 
         private const val PKIX = "PKIX"
         internal fun revocationEnabled(enabled: Boolean): PKIXParameters.() -> Unit = { isRevocationEnabled = enabled }
         internal val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = revocationEnabled(false)
-        public fun pkixCertValidator(provider: Provider): () -> CertPathValidator = { CertPathValidator.getInstance(PKIX, provider) }
+        public fun pkixCertValidator(provider: Provider): CertPathValidator =
+            CertPathValidator.getInstance(PKIX, provider)
     }
 }

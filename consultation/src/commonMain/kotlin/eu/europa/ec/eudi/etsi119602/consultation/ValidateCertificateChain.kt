@@ -15,8 +15,13 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-public fun interface ValidateCertificateChain<in CHAIN : Any> {
-    public suspend operator fun invoke(chain: CHAIN): Outcome
+/**
+ * An abstraction for validating a certificate chain
+ *
+ * @param CHAIN type representing a certificate chain
+ */
+public fun interface ValidateCertificateChain<in CHAIN : Any, in TRUST_ANCHOR : Any> {
+    public suspend operator fun invoke(chain: CHAIN, trustAnchors: Set<TRUST_ANCHOR>): Outcome
 
     public sealed interface Outcome {
         public data object Trusted : Outcome
