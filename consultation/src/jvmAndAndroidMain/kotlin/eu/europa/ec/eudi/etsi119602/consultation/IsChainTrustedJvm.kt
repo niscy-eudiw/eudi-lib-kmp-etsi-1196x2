@@ -18,8 +18,8 @@ package eu.europa.ec.eudi.etsi119602.consultation
 import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
 import eu.europa.ec.eudi.etsi119602.URI
 import eu.europa.ec.eudi.etsi119602.certificatesOf
+import eu.europa.ec.eudi.etsi119602.consultation.ValidateCertificateChainJvm.Companion.DEFAULT_CUSTOMIZATION
 import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
-import java.security.InvalidAlgorithmParameterException
 import java.security.Provider
 import java.security.cert.*
 
@@ -39,8 +39,8 @@ internal constructor(
         getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
         customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
     ) : this(
-        { CertificateFactory.getInstance(X_509) },
-        { CertPathValidator.getInstance(PKIX) },
+        ValidateCertificateChainJvm.X509_CERT_FACTORY,
+        ValidateCertificateChainJvm.PKIX_CERT_VALIDATOR,
         getTrustAnchorsByVerification,
         customization,
     )
@@ -50,8 +50,8 @@ internal constructor(
         getTrustAnchorsByVerification: GetTrustAnchorsByVerification,
         customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION,
     ) : this(
-        { CertificateFactory.getInstance(X_509, provider) },
-        { CertPathValidator.getInstance(PKIX, provider) },
+        ValidateCertificateChainJvm.x509CertFactory(provider),
+        ValidateCertificateChainJvm.pkixCertValidator(provider),
         getTrustAnchorsByVerification,
         customization,
     )
@@ -59,29 +59,13 @@ internal constructor(
     override suspend fun invoke(
         chain: List<X509Certificate>,
         signatureVerification: IsChainTrusted.SignatureVerification,
-    ): IsChainTrusted.Outcome {
-        require(chain.isNotEmpty()) { "Chain must not be empty" }
+    ): ValidateCertificateChain.Outcome {
         val trustAnchors = getTrustAnchorsByVerification(signatureVerification)
-        return validate(chain, trustAnchors)
+        val validateCertificate = ValidateCertificateChainJvm(certificateFactory, certPathValidator, trustAnchors, customization)
+        return validateCertificate(chain)
     }
 
-    private fun validate(chain: List<X509Certificate>, anchors: Set<TrustAnchor>): IsChainTrusted.Outcome =
-        try {
-            val pkixParameters =
-                PKIXParameters(anchors.toSet()).apply(customization)
-            val certPath = certificateFactory().generateCertPath(chain)
-            certPathValidator().validate(certPath, pkixParameters)
-            IsChainTrusted.Outcome.Trusted
-        } catch (e: CertPathValidatorException) {
-            IsChainTrusted.Outcome.Untrusted(e)
-        } catch (e: InvalidAlgorithmParameterException) {
-            IsChainTrusted.Outcome.Untrusted(e)
-        }
-
     public companion object {
-        internal val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = { isRevocationEnabled = false }
-        private const val X_509 = "X.509"
-        private const val PKIX = "PKIX"
     }
 }
 

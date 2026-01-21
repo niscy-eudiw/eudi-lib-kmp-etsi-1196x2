@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.etsi119602.consultation
 import eu.europa.ec.eudi.etsi119602.URI
 import eu.europa.ec.eudi.etsi119602.profile.*
 
-public fun interface IsChainTrusted<in CHAIN> {
+public fun interface IsChainTrusted<in CHAIN : Any> {
 
     public enum class SignatureVerification {
         EU_WIA,
@@ -36,16 +36,14 @@ public fun interface IsChainTrusted<in CHAIN> {
         EU_MDL_STATUS,
     }
 
-    public sealed interface Outcome {
-        public data object Trusted : Outcome
-        public data class Untrusted(val cause: Throwable) : Outcome
-    }
-
     public suspend operator fun invoke(
         chain: CHAIN,
         signatureVerification: SignatureVerification,
-    ): Outcome
+    ): ValidateCertificateChain.Outcome
 }
+
+public inline fun <C : Any, C1 : Any> IsChainTrusted<C>.contraMap(crossinline f: (C1) -> C): IsChainTrusted<C1> =
+    IsChainTrusted { c1, sv -> invoke(f(c1), sv) }
 
 public val IsChainTrusted.SignatureVerification.profile: EUListOfTrustedEntitiesProfile
     get() = when (this) {

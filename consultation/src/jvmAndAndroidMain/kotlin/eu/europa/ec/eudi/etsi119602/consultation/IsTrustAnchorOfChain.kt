@@ -20,55 +20,43 @@ import eu.europa.ec.eudi.etsi119602.x509CertificateOf
 import java.security.Provider
 import java.security.cert.CertPathValidator
 import java.security.cert.CertificateFactory
-import java.security.cert.PKIXParameters
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
-import kotlin.collections.map
-import kotlin.collections.orEmpty
 
 public class IsTrustAnchorOfChain private constructor(
     private val certificateFactory: () -> CertificateFactory,
     private val certPathValidator: () -> CertPathValidator,
     private val chain: List<X509Certificate>,
-) : Predicate<ServiceDigitalIdentity> {
+) {
 
     public constructor(chain: List<X509Certificate>) : this(
-        { CertificateFactory.getInstance(X_509) },
-        { CertPathValidator.getInstance(PKIX) },
-        chain,
-    )
-
-    public constructor(chain: List<X509Certificate>, provider: String) : this(
-        { CertificateFactory.getInstance(X_509, provider) },
-        { CertPathValidator.getInstance(PKIX, provider) },
+        ValidateCertificateChainJvm.X509_CERT_FACTORY,
+        ValidateCertificateChainJvm.PKIX_CERT_VALIDATOR,
         chain,
     )
 
     public constructor(chain: List<X509Certificate>, provider: Provider) : this(
-        { CertificateFactory.getInstance(X_509, provider) },
-        { CertPathValidator.getInstance(PKIX, provider) },
+        ValidateCertificateChainJvm.x509CertFactory(provider),
+        ValidateCertificateChainJvm.pkixCertValidator(provider),
         chain,
     )
 
-    override suspend operator fun invoke(value: ServiceDigitalIdentity): Boolean {
+    public suspend operator fun invoke(value: ServiceDigitalIdentity): Boolean {
         val crtFactory = certificateFactory()
-        val certPath = crtFactory.generateCertPath(chain)
-        val pkixParameters = run {
-            val anchors =
-                value.x509Certificates.orEmpty().map { pkiObj ->
-                    val anchorCert = crtFactory.x509CertificateOf(pkiObj)
-                    TrustAnchor(anchorCert, null)
-                }
-            PKIXParameters(anchors.toSet())
+        val anchors =
+            value.x509Certificates.orEmpty().map { pkiObj ->
+                val anchorCert = crtFactory.x509CertificateOf(pkiObj)
+                TrustAnchor(anchorCert, null)
+            }.toSet()
+        val validateCertificateChain = ValidateCertificateChainJvm(
+            { crtFactory },
+            certPathValidator,
+            anchors.toSet(),
+            customization = ValidateCertificateChainJvm.revocationEnabled(false),
+        )
+        return when (validateCertificateChain(chain)) {
+            ValidateCertificateChain.Outcome.Trusted -> true
+            is ValidateCertificateChain.Outcome.Untrusted -> false
         }
-        return try {
-            certPathValidator().validate(certPath, pkixParameters) != null
-        } catch (_: Throwable) {
-            false
-        }
-    }
-    internal companion object {
-        internal const val X_509 = "X.509"
-        internal const val PKIX = "PKIX"
     }
 }
