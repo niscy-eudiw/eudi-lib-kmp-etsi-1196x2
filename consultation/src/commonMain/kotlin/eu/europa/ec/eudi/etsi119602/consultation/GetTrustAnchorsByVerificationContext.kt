@@ -16,8 +16,8 @@
 package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
-import eu.europa.ec.eudi.etsi119602.PKIObject
-import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
+import eu.europa.ec.eudi.etsi119602.URI
+import eu.europa.ec.eudi.etsi119602.profile.*
 
 /**
  * A way to get a set of trust anchors for a given [VerificationContext]
@@ -55,46 +55,86 @@ public fun interface GetTrustAnchorsByVerificationContext<out TRUST_ANCHOR : Any
         public fun <TRUST_ANCHOR : Any> usingLoTE(
             getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
             trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TRUST_ANCHOR>,
+            trustSourcePerVerificationContext: (VerificationContext) -> TrustSource.LoTE,
         ): GetTrustAnchorsByVerificationContext<TRUST_ANCHOR> =
-            UsingLote(getLatestListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext)
+            UsingLote(
+                getLatestListOfTrustedEntitiesByType,
+                trustAnchorCreatorByVerificationContext,
+                trustSourcePerVerificationContext,
+            )
     }
 }
 
 internal class UsingLote<out TRUST_ANCHOR : Any>(
     private val getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
     private val trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TRUST_ANCHOR>,
+    private val trustSourcePerVerificationContext: (VerificationContext) -> TrustSource.LoTE,
 ) : GetTrustAnchorsByVerificationContext<TRUST_ANCHOR> {
 
     override suspend fun invoke(verificationContext: VerificationContext): List<TRUST_ANCHOR> {
-        val profile = verificationContext.profile
-        val serviceType = verificationContext.serviceType()
-        val listOfTrustedEntities = listOf(profile)
+        val (loteType, serviceType) = trustSourcePerVerificationContext(verificationContext)
+        val listOfTrustedEntities = listOf(loteType)
         val trustAnchorCreator = trustAnchorCreatorByVerificationContext(verificationContext)
-        return listOfTrustedEntities.trustAnchorsOfType(serviceType, trustAnchorCreator)
+        return with(trustAnchorCreator) {
+            listOfTrustedEntities.trustAnchorsOfType(serviceType)
+        }
     }
 
     @Throws(IllegalStateException::class)
-    private suspend fun listOf(profile: EUListOfTrustedEntitiesProfile): ListOfTrustedEntities {
-        val lote = getLatestListOfTrustedEntitiesByType(profile.listAndSchemeInformation.type)
-        checkNotNull(lote) { "Unable to find List of Trusted Entities for ${profile.listAndSchemeInformation.type}" }
-        with(profile) { lote.ensureCompliesToProfile() }
-        return lote
+    private suspend fun listOf(loteType: URI): ListOfTrustedEntities {
+        val lote = getLatestListOfTrustedEntitiesByType(loteType)
+        return checkNotNull(lote) { "Unable to find List of Trusted Entities for $loteType" }
     }
 
-    private fun ListOfTrustedEntities.trustAnchorsOfType(
-        serviceType: String,
-        trustAnchorCreator: (PKIObject) -> TRUST_ANCHOR,
-    ): List<TRUST_ANCHOR> =
-        buildList {
-            entities?.forEach { entity ->
-                entity.services.forEach { service ->
-                    val srvInformation = service.information
-                    if (srvInformation.typeIdentifier == serviceType) {
-                        srvInformation.digitalIdentity.x509Certificates?.forEach { pkiObj ->
-                            add(trustAnchorCreator(pkiObj))
-                        }
-                    }
+    companion object {
+
+        val WELL_KNOWN_PROFILES: List<EUListOfTrustedEntitiesProfile> = listOf(
+            EUPIDProvidersList,
+            EUWalletProvidersList,
+            EUWRPRCProvidersList,
+            EUWRPACProvidersList,
+            EUMDLProvidersList,
+        )
+
+        fun trustSources(verificationContext: VerificationContext, usedProfiles: List<EUListOfTrustedEntitiesProfile>): Pair<EUListOfTrustedEntitiesProfile, URI> {
+            val trustSource = verificationContext.loteTrustSource(usedProfiles)
+            checkNotNull(trustSource) { "Unable to find trust source for $verificationContext" }
+            val (loteType, svcType) = trustSource
+            val profile = usedProfiles.first { it.listAndSchemeInformation.type == loteType }
+            return profile to svcType
+        }
+
+        private fun VerificationContext.loteTrustSource(usedProfiles: List<EUListOfTrustedEntitiesProfile>): TrustSource.LoTE? {
+            fun EUListOfTrustedEntitiesProfile.svcTypeWithSuffix(suffix: String): URI {
+                val svcType = trustedEntities.serviceTypeIdentifiers.firstOrNull { it.endsWith(suffix) }
+                return checkNotNull(svcType) { "Unable to find service type for $this with suffix $suffix" }
+            }
+
+            fun EUListOfTrustedEntitiesProfile.trustSource(suffix: String): TrustSource.LoTE? =
+                if (this in usedProfiles) {
+                    TrustSource.LoTE(this, svcTypeWithSuffix(suffix))
+                } else {
+                    null
                 }
+
+            val issuance = "Issuance"
+            val revocation = "Revocation"
+            return when (this) {
+                VerificationContext.EU_WIA,
+                VerificationContext.EU_WUA,
+                -> EUWalletProvidersList.trustSource(issuance)
+                VerificationContext.EU_WUA_STATUS -> EUWalletProvidersList.trustSource(revocation)
+                VerificationContext.EU_PID -> EUPIDProvidersList.trustSource(issuance)
+                VerificationContext.EU_PID_STATUS -> EUPIDProvidersList.trustSource(revocation)
+                VerificationContext.EU_PUB_EAA -> EUPubEAAProvidersList.trustSource(issuance)
+                VerificationContext.EU_PUB_EAA_STATUS -> EUPubEAAProvidersList.trustSource(revocation)
+                VerificationContext.EU_WRPRC -> EUWRPRCProvidersList.trustSource(issuance)
+                VerificationContext.EU_WRPRC_STATUS -> EUWRPRCProvidersList.trustSource(revocation)
+                VerificationContext.EU_WRPAC -> EUWRPACProvidersList.trustSource(issuance)
+                VerificationContext.EU_WRPAC_STATUS -> EUWRPACProvidersList.trustSource(revocation)
+                VerificationContext.EU_MDL -> EUMDLProvidersList.trustSource(issuance)
+                VerificationContext.EU_MDL_STATUS -> EUMDLProvidersList.trustSource(revocation)
             }
         }
+    }
 }

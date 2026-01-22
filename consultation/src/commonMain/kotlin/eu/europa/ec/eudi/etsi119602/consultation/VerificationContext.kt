@@ -15,15 +15,6 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.URI
-import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
-import eu.europa.ec.eudi.etsi119602.profile.EUMDLProvidersList
-import eu.europa.ec.eudi.etsi119602.profile.EUPIDProvidersList
-import eu.europa.ec.eudi.etsi119602.profile.EUPubEAAProvidersList
-import eu.europa.ec.eudi.etsi119602.profile.EUWRPACProvidersList
-import eu.europa.ec.eudi.etsi119602.profile.EUWRPRCProvidersList
-import eu.europa.ec.eudi.etsi119602.profile.EUWalletProvidersList
-
 public enum class VerificationContext {
     /**
      * Check the wallet provider's signature for a WIA
@@ -81,6 +72,8 @@ public enum class VerificationContext {
      * issuance and presentation respectively.
      */
     EU_WRPRC,
+
+    @Deprecated("to be removed")
     EU_WRPRC_STATUS,
 
     /**
@@ -90,6 +83,8 @@ public enum class VerificationContext {
      * issuance (signed credential issuer metadata) and presentation respectively (signed authorization request).
      */
     EU_WRPAC,
+
+    @Deprecated("to be removed")
     EU_WRPAC_STATUS,
 
     /**
@@ -102,62 +97,4 @@ public enum class VerificationContext {
      * Check the signature of a Status Lists or Identifiers List that keeps the status of an mDL
      */
     EU_MDL_STATUS,
-}
-
-/**
- * Associate a List of Trusted Entities Profile with a verification context
- */
-public val VerificationContext.profile: EUListOfTrustedEntitiesProfile
-    get() = when (this) {
-        VerificationContext.EU_WIA,
-        VerificationContext.EU_WUA,
-        VerificationContext.EU_WUA_STATUS,
-        -> EUWalletProvidersList
-
-        VerificationContext.EU_PID,
-        VerificationContext.EU_PID_STATUS,
-        -> EUPIDProvidersList
-
-        VerificationContext.EU_PUB_EAA,
-        VerificationContext.EU_PUB_EAA_STATUS,
-        -> EUPubEAAProvidersList
-
-        VerificationContext.EU_WRPRC,
-        VerificationContext.EU_WRPRC_STATUS,
-        -> EUWRPRCProvidersList
-
-        VerificationContext.EU_WRPAC,
-        VerificationContext.EU_WRPAC_STATUS,
-        -> EUWRPACProvidersList
-
-        VerificationContext.EU_MDL,
-        VerificationContext.EU_MDL_STATUS,
-        -> EUMDLProvidersList
-    }
-
-/**
- * Associate a Service Type Identifier with a verification context
- */
-public fun VerificationContext.serviceType(): URI {
-    val suffix = run {
-        val issuance = "Issuance"
-        val revocation = "Revocation"
-        when (this) {
-            VerificationContext.EU_WIA -> issuance
-            VerificationContext.EU_WUA -> issuance
-            VerificationContext.EU_WUA_STATUS -> revocation
-            VerificationContext.EU_PID -> issuance
-            VerificationContext.EU_PID_STATUS -> revocation
-            VerificationContext.EU_PUB_EAA -> issuance
-            VerificationContext.EU_PUB_EAA_STATUS -> revocation
-            VerificationContext.EU_WRPRC -> issuance
-            VerificationContext.EU_WRPRC_STATUS -> revocation
-            VerificationContext.EU_WRPAC -> issuance
-            VerificationContext.EU_WRPAC_STATUS -> revocation
-            VerificationContext.EU_MDL -> issuance
-            VerificationContext.EU_MDL_STATUS -> revocation
-        }
-    }
-    val result = profile.trustedEntities.serviceTypeIdentifiers.firstOrNull { it.endsWith(suffix) }
-    return checkNotNull(result) { "Unable to find service type for $this with suffix $suffix" }
 }

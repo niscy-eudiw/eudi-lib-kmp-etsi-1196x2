@@ -71,11 +71,16 @@ public fun interface IsChainTrusted<in CHAIN : Any> {
             validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
             getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
             trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TRUST_ANCHOR>,
-        ): IsChainTrusted<CHAIN> =
-            invoke(
-                validateCertificateChain,
-                GetTrustAnchorsByVerificationContext.usingLoTE(getLatestListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext),
-            )
+            trustSourcePerVerificationContext: (VerificationContext) -> TrustSource.LoTE,
+        ): IsChainTrusted<CHAIN> {
+            val useLoTE =
+                GetTrustAnchorsByVerificationContext.usingLoTE(
+                    getLatestListOfTrustedEntitiesByType,
+                    trustAnchorCreatorByVerificationContext,
+                    trustSourcePerVerificationContext,
+                )
+            return invoke(validateCertificateChain, useLoTE)
+        }
     }
 }
 

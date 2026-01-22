@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.PKIObject
 import eu.europa.ec.eudi.etsi119602.x509CertificateOf
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
@@ -26,24 +25,33 @@ import java.security.cert.X509Certificate
 //
 
 public fun IsChainTrusted.Companion.jvm(
-    validateCertificateChain: ValidateCertificateChainJvm,
+    validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     getTrustAnchorsByVerificationContext: GetTrustAnchorsByVerificationContext<TrustAnchor>,
 ): IsChainTrusted<List<X509Certificate>> =
     invoke(validateCertificateChain, getTrustAnchorsByVerificationContext)
 
 public fun IsChainTrusted.Companion.jvmUsingLoTE(
-    validateCertificateChain: ValidateCertificateChainJvm,
+    validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
     trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TrustAnchor> = createTrustAnchorWithNoNameConstraints(
         validateCertificateChain.certificateFactory,
     ),
+    trustSourcePerVerificationContext: (VerificationContext) -> TrustSource.LoTE,
 ): IsChainTrusted<List<X509Certificate>> =
-    usingLoTE(validateCertificateChain, getLatestListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext)
+    usingLoTE(
+        validateCertificateChain,
+        getLatestListOfTrustedEntitiesByType,
+        trustAnchorCreatorByVerificationContext,
+        trustSourcePerVerificationContext,
+    )
 
 public fun createTrustAnchorWithNoNameConstraints(factory: CertificateFactory): TrustAnchorCreatorByVerificationContext<TrustAnchor> =
-    TrustAnchorCreatorByVerificationContext { _ ->
-        { pkiObject -> factory.trustAnchorOf(pkiObject, nameConstraints = null) }
-    }
+    TrustAnchorCreatorByVerificationContext { _ -> TrustAnchorCreator.jvm(factory) }
 
-public fun CertificateFactory.trustAnchorOf(pkiObject: PKIObject, nameConstraints: ByteArray?): TrustAnchor =
-    TrustAnchor(x509CertificateOf(pkiObject), nameConstraints)
+public fun TrustAnchorCreator.Companion.jvm(
+    certificateFactory: CertificateFactory = ValidateCertificateChainJvm.X509_CERT_FACTORY,
+    nameConstraints: ByteArray? = null,
+): TrustAnchorCreator<TrustAnchor> =
+    TrustAnchorCreator { pkiObject ->
+        TrustAnchor(certificateFactory.x509CertificateOf(pkiObject), nameConstraints)
+    }

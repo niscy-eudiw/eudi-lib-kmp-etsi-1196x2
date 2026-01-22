@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
+import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
 import eu.europa.ec.eudi.etsi119602.PKIObject
 
 /**
@@ -22,7 +23,24 @@ import eu.europa.ec.eudi.etsi119602.PKIObject
  *
  * @param TRUST_ANCHOR the type representing a trust anchor
  */
-public typealias TrustAnchorCreator<TRUST_ANCHOR> = (PKIObject) -> TRUST_ANCHOR
+public fun interface TrustAnchorCreator<out TRUST_ANCHOR : Any> {
+    public fun invoke(pkiObject: PKIObject): TRUST_ANCHOR
+
+    public fun ListOfTrustedEntities.trustAnchorsOfType(serviceType: String): List<TRUST_ANCHOR> =
+        buildList {
+            entities?.forEach { entity ->
+                entity.services.forEach { service ->
+                    val srvInformation = service.information
+                    if (srvInformation.typeIdentifier == serviceType) {
+                        srvInformation.digitalIdentity.x509Certificates?.forEach { pkiObj ->
+                            add(invoke(pkiObj))
+                        }
+                    }
+                }
+            }
+        }
+    public companion object
+}
 
 /**
  * Represents a way to obtain a [TrustAnchorCreator] for a [VerificationContext]
