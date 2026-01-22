@@ -15,14 +15,19 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.x509CertificateOf
+import java.security.Provider
+import java.security.cert.CertPathValidator
 import java.security.cert.CertificateFactory
-import java.security.cert.TrustAnchor
 
-public fun TrustAnchorCreator.Companion.jvm(
-    certificateFactory: CertificateFactory = JvmSecurity.X509_CERT_FACTORY,
-    nameConstraints: ByteArray? = null,
-): TrustAnchorCreator<TrustAnchor> =
-    TrustAnchorCreator { pkiObject ->
-        TrustAnchor(certificateFactory.x509CertificateOf(pkiObject), nameConstraints)
-    }
+public object JvmSecurity {
+
+    private const val X_509 = "X.509"
+    public val X509_CERT_FACTORY: CertificateFactory get() = CertificateFactory.getInstance(X_509)
+    public val PKIX_CERT_VALIDATOR: CertPathValidator get() = CertPathValidator.getInstance(PKIX)
+    public fun x509CertFactory(provider: Provider): CertificateFactory =
+        CertificateFactory.getInstance(X_509, provider)
+
+    private const val PKIX = "PKIX"
+    public fun pkixCertValidator(provider: Provider): CertPathValidator =
+        CertPathValidator.getInstance(PKIX, provider)
+}

@@ -17,7 +17,13 @@ package eu.europa.ec.eudi.etsi119602.consultation
 
 public fun interface IsChainTrusted<in CHAIN : Any, in TRUST_SOURCE : TrustSource> {
 
-    public suspend operator fun invoke(chain: CHAIN, trustSource: TRUST_SOURCE): ValidateCertificateChain.Outcome
+    public sealed interface Outcome {
+        public data object Trusted : Outcome
+        public data class NotTrusted(val cause: Throwable) : Outcome
+        public data object TrustSourceNotFound : Outcome
+    }
+
+    public suspend operator fun invoke(chain: CHAIN, trustSource: TRUST_SOURCE): Outcome
 
     public companion object {
         public fun <CHAIN : Any, TRUST_ANCHOR : Any> usingLoTEs(
@@ -26,10 +32,13 @@ public fun interface IsChainTrusted<in CHAIN : Any, in TRUST_SOURCE : TrustSourc
             getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
         ): IsChainTrusted<CHAIN, TrustSource.LoTE> = IsChainTrusted { chain, trustSource ->
             when (val lote = getLatestListOfTrustedEntitiesByType(trustSource.loteType)) {
-                null -> ValidateCertificateChain.Outcome.Untrusted(IllegalStateException("No Lote found for ${trustSource.loteType}"))
+                null -> Outcome.TrustSourceNotFound
                 else -> with(trustAnchorCreator) {
                     val trustAnchors = lote.trustAnchorsOfType(trustSource.serviceType)
-                    validateCertificateChain(chain, trustAnchors.toSet())
+                    when (val outcome = validateCertificateChain(chain, trustAnchors.toSet())) {
+                        is ValidateCertificateChain.Outcome.Trusted -> Outcome.Trusted
+                        is ValidateCertificateChain.Outcome.Untrusted -> Outcome.NotTrusted(outcome.cause)
+                    }
                 }
             }
         }

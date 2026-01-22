@@ -29,10 +29,10 @@ public class ValidateCertificateChainJvm(
 ) : ValidateCertificateChain<List<X509Certificate>, TrustAnchor> {
 
     public constructor(customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION) :
-        this(X509_CERT_FACTORY, PKIX_CERT_VALIDATOR, customization)
+        this(JvmSecurity.X509_CERT_FACTORY, JvmSecurity.PKIX_CERT_VALIDATOR, customization)
 
     public constructor(provider: Provider, customization: PKIXParameters.() -> Unit = DEFAULT_CUSTOMIZATION) :
-        this(x509CertFactory(provider), pkixCertValidator(provider), customization)
+        this(JvmSecurity.x509CertFactory(provider), JvmSecurity.pkixCertValidator(provider), customization)
 
     override suspend fun invoke(
         chain: List<X509Certificate>,
@@ -53,15 +53,6 @@ public class ValidateCertificateChainJvm(
     }
 
     public companion object {
-        private const val X_509 = "X.509"
-        public val X509_CERT_FACTORY: CertificateFactory get() = CertificateFactory.getInstance(X_509)
-        public val PKIX_CERT_VALIDATOR: CertPathValidator get() = CertPathValidator.getInstance(PKIX)
-        public fun x509CertFactory(provider: Provider): CertificateFactory =
-            CertificateFactory.getInstance(X_509, provider)
-
-        private const val PKIX = "PKIX"
         internal val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = { }
-        public fun pkixCertValidator(provider: Provider): CertPathValidator =
-            CertPathValidator.getInstance(PKIX, provider)
     }
 }

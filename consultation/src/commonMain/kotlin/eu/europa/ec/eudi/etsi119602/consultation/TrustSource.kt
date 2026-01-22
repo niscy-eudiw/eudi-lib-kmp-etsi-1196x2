@@ -20,5 +20,5 @@ import eu.europa.ec.eudi.etsi119602.URI
 public sealed interface TrustSource {
     public data class LoTE(val loteType: URI, val serviceType: URI) : TrustSource
     public data class LoTL(val lotlType: URI, val serviceType: URI) : TrustSource
-    public data class Keystore(val name: String, val filter: (String) -> Boolean) : TrustSource
+    public data object OutOfBand : TrustSource
 }

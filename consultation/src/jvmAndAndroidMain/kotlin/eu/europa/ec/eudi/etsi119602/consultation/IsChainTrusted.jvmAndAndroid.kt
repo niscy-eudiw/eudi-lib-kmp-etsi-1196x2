@@ -37,5 +37,5 @@ public fun IsChainTrusted.Companion.jvmUsingLoTL(
 public fun IsChainTrusted.Companion.jvmUsingKeystore(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     trustAnchorCreator: TrustAnchorCreator<TrustAnchor> = TrustAnchorCreator.jvm(validateCertificateChain.certificateFactory),
-): IsChainTrusted<List<X509Certificate>, TrustSource.Keystore> =
+): IsChainTrusted<List<X509Certificate>, TrustSource.OutOfBand> =
     TODO()
