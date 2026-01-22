@@ -15,10 +15,14 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.URI
+import eu.europa.ec.eudi.etsi119602.x509CertificateOf
+import java.security.cert.CertificateFactory
+import java.security.cert.TrustAnchor
 
-public sealed interface TrustSource {
-    public data class LoTE(val loteType: URI, val serviceType: URI) : TrustSource
-    public data class LoTL(val lotlType: URI, val serviceType: URI) : TrustSource
-    public data class Keystore(val name: String, val filter: (String) -> Boolean) : TrustSource
-}
+public fun TrustAnchorCreator.Companion.jvm(
+    certificateFactory: CertificateFactory = ValidateCertificateChainJvm.X509_CERT_FACTORY,
+    nameConstraints: ByteArray? = null,
+): TrustAnchorCreator<TrustAnchor> =
+    TrustAnchorCreator { pkiObject ->
+        TrustAnchor(certificateFactory.x509CertificateOf(pkiObject), nameConstraints)
+    }

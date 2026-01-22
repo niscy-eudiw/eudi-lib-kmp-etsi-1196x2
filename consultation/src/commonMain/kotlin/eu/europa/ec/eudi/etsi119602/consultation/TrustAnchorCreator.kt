@@ -39,18 +39,6 @@ public fun interface TrustAnchorCreator<out TRUST_ANCHOR : Any> {
                 }
             }
         }
-    public companion object
-}
 
-/**
- * Represents a way to obtain a [TrustAnchorCreator] for a [VerificationContext]
- * @param TRUST_ANCHOR the type representing a trust anchor
- */
-public fun interface TrustAnchorCreatorByVerificationContext<out TRUST_ANCHOR : Any> {
-    /**
-     * A way to obtain a [TrustAnchorCreator] for a [VerificationContext]
-     * @param verificationContext the verification context
-     * @return a trust anchor creator
-     */
-    public operator fun invoke(verificationContext: VerificationContext): TrustAnchorCreator<TRUST_ANCHOR>
+    public companion object
 }

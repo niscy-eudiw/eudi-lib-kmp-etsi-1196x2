@@ -15,10 +15,13 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.URI
+import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
+import java.security.cert.TrustAnchor
+import java.security.cert.X509Certificate
 
-public sealed interface TrustSource {
-    public data class LoTE(val loteType: URI, val serviceType: URI) : TrustSource
-    public data class LoTL(val lotlType: URI, val serviceType: URI) : TrustSource
-    public data class Keystore(val name: String, val filter: (String) -> Boolean) : TrustSource
-}
+fun verifyJPLearningCredentialSignature(
+    validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
+    trustAnchorCreator: TrustAnchorCreator<TrustAnchor> = TrustAnchorCreator.jvm(),
+    lote: ListOfTrustedEntities,
+): IsChainTrusted<List<X509Certificate>, TrustSource.LoTE> =
+    IsChainTrusted.usingLoTEs(validateCertificateChain, trustAnchorCreator) { _ -> lote }
