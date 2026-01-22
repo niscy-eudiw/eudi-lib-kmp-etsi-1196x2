@@ -18,6 +18,14 @@ package eu.europa.ec.eudi.etsi119602.consultation
 import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
 import eu.europa.ec.eudi.etsi119602.URI
 
-public fun interface GetListOfTrustedEntitiesByType {
+/**
+ * A way to get a list of trusted entities by (lote type) type
+ */
+public fun interface GetLatestListOfTrustedEntitiesByType {
+    /**
+     * Gets a list of trusted entities by (lote type) type
+     * @param loteType the (lote type) type
+     * @return the list of trusted entities or null if not found
+     */
     public suspend operator fun invoke(loteType: URI): ListOfTrustedEntities?
 }

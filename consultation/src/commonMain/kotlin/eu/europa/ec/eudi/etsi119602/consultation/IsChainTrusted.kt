@@ -29,6 +29,7 @@ public fun interface IsChainTrusted<in CHAIN : Any> {
      *
      * @param chain certificate chain to check
      * @param verificationContext verification context
+     * @return outcome of the check
      */
     public suspend operator fun invoke(
         chain: CHAIN,
@@ -36,21 +37,45 @@ public fun interface IsChainTrusted<in CHAIN : Any> {
     ): ValidateCertificateChain.Outcome
 
     public companion object {
+
+        /**
+         * Creates an instance of [IsChainTrusted] using the provided [validateCertificateChain]
+         * and [getTrustAnchorsByVerificationContext]
+         *
+         * @param getTrustAnchorsByVerificationContext the function to obtain the trust anchors for the verification context
+         * @param validateCertificateChain the function to validate the certificate chain
+         * @param CHAIN the type representing a certificate chain
+         * @param TRUST_ANCHOR the type representing a trust anchor
+         * @return an instance of [IsChainTrusted]
+         */
         public operator fun <CHAIN : Any, TRUST_ANCHOR : Any> invoke(
             validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
             getTrustAnchorsByVerificationContext: GetTrustAnchorsByVerificationContext<TRUST_ANCHOR>,
         ): IsChainTrusted<CHAIN> =
             IsChainTrusted { chain, signatureVerification ->
                 val trustAnchors = getTrustAnchorsByVerificationContext(signatureVerification)
-                validateCertificateChain(chain, trustAnchors)
+                validateCertificateChain(chain, trustAnchors.toSet())
             }
 
+        /**
+         * Creates an instance of [IsChainTrusted] that uses list of trusted entities
+         *
+         * @param validateCertificateChain the function to validate the certificate chain
+         * @param getLatestListOfTrustedEntitiesByType the function to obtain the list of trusted entities by type
+         * @param trustAnchorCreatorByVerificationContext the function to obtain the trust anchor creator by verification context
+         * @param CHAIN the type representing a certificate chain
+         * @param TRUST_ANCHOR the type representing a trust anchor
+         * @return an instance of [IsChainTrusted]
+         */
         public fun <CHAIN : Any, TRUST_ANCHOR : Any> usingLoTE(
             validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
-            getListOfTrustedEntitiesByType: GetListOfTrustedEntitiesByType,
+            getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
             trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TRUST_ANCHOR>,
         ): IsChainTrusted<CHAIN> =
-            invoke(validateCertificateChain, GetTrustAnchorsByVerificationContext.usingLoTE(getListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext))
+            invoke(
+                validateCertificateChain,
+                GetTrustAnchorsByVerificationContext.usingLoTE(getLatestListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext),
+            )
     }
 }
 

@@ -266,9 +266,9 @@ public data class SchemeOperatorAddress(
     @SerialName(ETSI19602.SCHEME_OPERATOR_ELECTRONIC_ADDRESS) @Required val electronicAddresses: List<MultiLanguageURI>,
 ) {
     init {
-        Assertions.requireNonEmpty(postalAddresses, ETSI19602.SCHEME_OPERATOR_POSTAL_ADDRESS)
-        require(electronicAddresses.size >= 2) {
-            "${ETSI19602.SCHEME_OPERATOR_ELECTRONIC_ADDRESS} must contain at least an e-mail and a web-site address"
+        with(Assertions) {
+            requireNonEmpty(postalAddresses, ETSI19602.SCHEME_OPERATOR_POSTAL_ADDRESS)
+            requireNonEmpty(electronicAddresses, ETSI19602.SCHEME_OPERATOR_ELECTRONIC_ADDRESS)
         }
     }
 }

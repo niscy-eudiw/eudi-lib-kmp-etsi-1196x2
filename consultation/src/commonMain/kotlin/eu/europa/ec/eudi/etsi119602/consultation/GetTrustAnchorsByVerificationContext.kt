@@ -19,29 +19,53 @@ import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
 import eu.europa.ec.eudi.etsi119602.PKIObject
 import eu.europa.ec.eudi.etsi119602.profile.EUListOfTrustedEntitiesProfile
 
+/**
+ * A way to get a set of trust anchors for a given [VerificationContext]
+ *
+ * @param TRUST_ANCHOR the type representing a trust anchor
+ */
 public fun interface GetTrustAnchorsByVerificationContext<out TRUST_ANCHOR : Any> {
-    public suspend operator fun invoke(verificationContext: VerificationContext): Set<TRUST_ANCHOR>
 
+    /**
+     * Gets a set of trust anchors for a given [VerificationContext]
+     * @param verificationContext the verification context
+     * @return a set of trust anchors
+     */
+    public suspend operator fun invoke(verificationContext: VerificationContext): List<TRUST_ANCHOR>
+
+    /**
+     * Combines this [GetTrustAnchorsByVerificationContext] with another to create a new one
+     * @param other the other [GetTrustAnchorsByVerificationContext]
+     * @return a new [GetTrustAnchorsByVerificationContext]
+     */
     public operator fun plus(other: GetTrustAnchorsByVerificationContext<@UnsafeVariance TRUST_ANCHOR>): GetTrustAnchorsByVerificationContext<TRUST_ANCHOR> =
         GetTrustAnchorsByVerificationContext { signatureVerification ->
             this.invoke(signatureVerification) + other.invoke(signatureVerification)
         }
 
     public companion object {
+
+        /**
+         * Creates an instance of [GetTrustAnchorsByVerificationContext] using the provided [getLatestListOfTrustedEntitiesByType]
+         * @param getLatestListOfTrustedEntitiesByType the function to obtain the list of trusted entities by type
+         * @param trustAnchorCreatorByVerificationContext the function to obtain the trust anchor creator by verification context
+         * @Param TRUST_ANCHOR the type representing a trust anchor
+         * @return an instance of [GetTrustAnchorsByVerificationContext]
+         */
         public fun <TRUST_ANCHOR : Any> usingLoTE(
-            getListOfTrustedEntitiesByType: GetListOfTrustedEntitiesByType,
+            getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
             trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TRUST_ANCHOR>,
         ): GetTrustAnchorsByVerificationContext<TRUST_ANCHOR> =
-            UsingLote(getListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext)
+            UsingLote(getLatestListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext)
     }
 }
 
 internal class UsingLote<out TRUST_ANCHOR : Any>(
-    private val getListOfTrustedEntitiesByType: GetListOfTrustedEntitiesByType,
+    private val getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
     private val trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TRUST_ANCHOR>,
 ) : GetTrustAnchorsByVerificationContext<TRUST_ANCHOR> {
 
-    override suspend fun invoke(verificationContext: VerificationContext): Set<TRUST_ANCHOR> {
+    override suspend fun invoke(verificationContext: VerificationContext): List<TRUST_ANCHOR> {
         val profile = verificationContext.profile
         val serviceType = verificationContext.serviceType()
         val listOfTrustedEntities = listOf(profile)
@@ -51,7 +75,7 @@ internal class UsingLote<out TRUST_ANCHOR : Any>(
 
     @Throws(IllegalStateException::class)
     private suspend fun listOf(profile: EUListOfTrustedEntitiesProfile): ListOfTrustedEntities {
-        val lote = getListOfTrustedEntitiesByType(profile.listAndSchemeInformation.type)
+        val lote = getLatestListOfTrustedEntitiesByType(profile.listAndSchemeInformation.type)
         checkNotNull(lote) { "Unable to find List of Trusted Entities for ${profile.listAndSchemeInformation.type}" }
         with(profile) { lote.ensureCompliesToProfile() }
         return lote
@@ -60,8 +84,8 @@ internal class UsingLote<out TRUST_ANCHOR : Any>(
     private fun ListOfTrustedEntities.trustAnchorsOfType(
         serviceType: String,
         trustAnchorCreator: (PKIObject) -> TRUST_ANCHOR,
-    ): Set<TRUST_ANCHOR> =
-        buildSet {
+    ): List<TRUST_ANCHOR> =
+        buildList {
             entities?.forEach { entity ->
                 entity.services.forEach { service ->
                     val srvInformation = service.information

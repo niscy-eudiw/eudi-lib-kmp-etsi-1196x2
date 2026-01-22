@@ -17,6 +17,22 @@ package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.PKIObject
 
+/**
+ * A way to create a trust anchor from a [PKIObject]
+ *
+ * @param TRUST_ANCHOR the type representing a trust anchor
+ */
+public typealias TrustAnchorCreator<TRUST_ANCHOR> = (PKIObject) -> TRUST_ANCHOR
+
+/**
+ * Represents a way to obtain a [TrustAnchorCreator] for a [VerificationContext]
+ * @param TRUST_ANCHOR the type representing a trust anchor
+ */
 public fun interface TrustAnchorCreatorByVerificationContext<out TRUST_ANCHOR : Any> {
-    public operator fun invoke(verificationContext: VerificationContext): (PKIObject) -> TRUST_ANCHOR
+    /**
+     * A way to obtain a [TrustAnchorCreator] for a [VerificationContext]
+     * @param verificationContext the verification context
+     * @return a trust anchor creator
+     */
+    public operator fun invoke(verificationContext: VerificationContext): TrustAnchorCreator<TRUST_ANCHOR>
 }

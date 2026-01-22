@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
+import eu.europa.ec.eudi.etsi119602.PKIObject
 import eu.europa.ec.eudi.etsi119602.x509CertificateOf
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
@@ -32,17 +33,17 @@ public fun IsChainTrusted.Companion.jvm(
 
 public fun IsChainTrusted.Companion.jvmUsingLoTE(
     validateCertificateChain: ValidateCertificateChainJvm,
-    getListOfTrustedEntitiesByType: GetListOfTrustedEntitiesByType,
+    getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
     trustAnchorCreatorByVerificationContext: TrustAnchorCreatorByVerificationContext<TrustAnchor> = createTrustAnchorWithNoNameConstraints(
         validateCertificateChain.certificateFactory,
     ),
 ): IsChainTrusted<List<X509Certificate>> =
-    usingLoTE(validateCertificateChain, getListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext)
+    usingLoTE(validateCertificateChain, getLatestListOfTrustedEntitiesByType, trustAnchorCreatorByVerificationContext)
 
 public fun createTrustAnchorWithNoNameConstraints(factory: CertificateFactory): TrustAnchorCreatorByVerificationContext<TrustAnchor> =
     TrustAnchorCreatorByVerificationContext { _ ->
-        { pkiObj ->
-            val certificate = factory.x509CertificateOf(pkiObj)
-            TrustAnchor(certificate, null)
-        }
+        { pkiObject -> factory.trustAnchorOf(pkiObject, nameConstraints = null) }
     }
+
+public fun CertificateFactory.trustAnchorOf(pkiObject: PKIObject, nameConstraints: ByteArray?): TrustAnchor =
+    TrustAnchor(x509CertificateOf(pkiObject), nameConstraints)
