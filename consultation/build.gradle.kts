@@ -89,22 +89,6 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.ktor.client.core)
-                implementation(libs.ktor.client.serialization)
-                implementation(libs.ktor.client.content.negotiation)
-                implementation(libs.ktor.serialization.json)
-            }
-        }
-
-        val jvmAndAndroidTest by getting {
-            dependencies {
-                implementation(libs.ktor.client.java)
-            }
-        }
-
-        androidUnitTest {
-            dependencies {
-                implementation(libs.ktor.client.okhttp)
             }
         }
     }
@@ -168,7 +152,8 @@ tasks.withType<DokkaTask>().configureEach {
 
             val remoteSourceUrl =
                 System.getenv()["GIT_REF_NAME"]?.let {
-                    URI.create("${properties["POM_SCM_URL"]}/tree/$it/${project.layout.projectDirectory.asFile.name}/src").toURL()
+                    URI.create("${properties["POM_SCM_URL"]}/tree/$it/${project.layout.projectDirectory.asFile.name}/src")
+                        .toURL()
                 }
             remoteSourceUrl
                 ?.let {
