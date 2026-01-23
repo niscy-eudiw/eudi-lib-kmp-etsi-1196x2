@@ -28,14 +28,16 @@ import java.security.cert.X509Certificate
 public fun IsChainTrusted.Companion.jvmUsingLoTEs(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     getLatestListOfTrustedEntitiesByType: GetLatestListOfTrustedEntitiesByType,
-): IsChainTrusted<List<X509Certificate>, TrustSource.LoTE> =
-    invoke(validateCertificateChain) { trustSource ->
+): (TrustSource.LoTE) -> IsChainTrusted<List<X509Certificate>> = { trustSource ->
+    IsChainTrusted(validateCertificateChain) {
+        val list = getLatestListOfTrustedEntitiesByType(trustSource.loteType)
         val trustAnchorCreator =
             trustAnchorCreatorFromPkiObject(validateCertificateChain.certificateFactory)
-        getLatestListOfTrustedEntitiesByType(trustSource.loteType)?.let { lote ->
+        list?.let { lote ->
             trustAnchorCreator.trustAnchorsOfType(lote, trustSource.serviceType)
-        }
+        } ?: emptyList()
     }
+}
 
 private fun trustAnchorCreatorFromPkiObject(certificateFactory: CertificateFactory) =
     TrustAnchorCreator.jvm().contraMap<X509Certificate, TrustAnchor, PKIObject> { pkiObj ->
@@ -58,9 +60,3 @@ internal fun <TRUST_ANCHOR : Any> TrustAnchorCreator<PKIObject, TRUST_ANCHOR>.tr
             }
         }
     }
-
-public fun IsChainTrusted.Companion.jvmUsingKeystore(
-    validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
-    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = TrustAnchorCreator.jvm(),
-): IsChainTrusted<List<X509Certificate>, TrustSource.OutOfBand> =
-    TODO()

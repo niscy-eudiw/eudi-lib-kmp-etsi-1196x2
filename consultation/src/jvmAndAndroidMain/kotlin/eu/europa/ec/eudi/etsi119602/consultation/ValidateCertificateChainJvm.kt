@@ -46,9 +46,9 @@ public class ValidateCertificateChainJvm(
             certPathValidator.validate(certPath, pkixParameters)
             ValidateCertificateChain.Outcome.Trusted
         } catch (e: CertPathValidatorException) {
-            ValidateCertificateChain.Outcome.Untrusted(e)
+            ValidateCertificateChain.Outcome.NotTrusted(e)
         } catch (e: InvalidAlgorithmParameterException) {
-            ValidateCertificateChain.Outcome.Untrusted(e)
+            ValidateCertificateChain.Outcome.NotTrusted(e)
         }
     }
 

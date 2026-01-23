@@ -15,29 +15,21 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-public fun interface IsChainTrusted<in CHAIN : Any, in TRUST_SOURCE : TrustSource> {
+public fun interface IsChainTrusted<in CHAIN : Any> {
 
-    public sealed interface Outcome {
-        public data object Trusted : Outcome
-        public data class NotTrusted(val cause: Throwable) : Outcome
-        public data object TrustSourceNotFound : Outcome
-    }
-
-    public suspend operator fun invoke(chain: CHAIN, trustSource: TRUST_SOURCE): Outcome
+    public suspend operator fun invoke(chain: CHAIN): ValidateCertificateChain.Outcome
 
     public companion object {
-        public operator fun <CHAIN : Any, TRUST_SOURCE : TrustSource, TRUST_ANCHOR : Any> invoke(
+        public operator fun <CHAIN : Any, TRUST_ANCHOR : Any> invoke(
             validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
-            getTrustAnchorsFromSource: suspend (TRUST_SOURCE) -> List<TRUST_ANCHOR>?,
-        ): IsChainTrusted<CHAIN, TRUST_SOURCE> =
-            IsChainTrusted { chain, trustSource ->
-                when (val trustAnchors = getTrustAnchorsFromSource(trustSource)) {
-                    null -> Outcome.TrustSourceNotFound
-                    else -> when (val outcome = validateCertificateChain(chain, trustAnchors.toSet())) {
-                        is ValidateCertificateChain.Outcome.Trusted -> Outcome.Trusted
-                        is ValidateCertificateChain.Outcome.Untrusted -> Outcome.NotTrusted(outcome.cause)
-                    }
-                }
+            getTrustAnchors: suspend () -> List<TRUST_ANCHOR>,
+        ): IsChainTrusted<CHAIN> =
+            IsChainTrusted { chain ->
+                val trustAnchors = getTrustAnchors()
+                validateCertificateChain(chain, trustAnchors.toSet())
             }
     }
 }
+
+public inline fun <C1 : Any, C2 : Any> IsChainTrusted<C1>.contraMap(crossinline f: (C2) -> C1): IsChainTrusted<C2> =
+    IsChainTrusted { chain -> invoke(f(chain)) }

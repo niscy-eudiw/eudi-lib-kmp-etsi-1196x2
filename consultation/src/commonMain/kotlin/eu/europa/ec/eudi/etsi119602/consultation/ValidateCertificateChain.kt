@@ -36,6 +36,6 @@ public fun interface ValidateCertificateChain<in CHAIN : Any, in TRUST_ANCHOR : 
      */
     public sealed interface Outcome {
         public data object Trusted : Outcome
-        public data class Untrusted(val cause: Throwable) : Outcome
+        public data class NotTrusted(val cause: Throwable) : Outcome
     }
 }
