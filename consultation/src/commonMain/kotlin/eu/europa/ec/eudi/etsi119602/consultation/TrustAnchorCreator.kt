@@ -23,7 +23,7 @@ import eu.europa.ec.eudi.etsi119602.PKIObject
  * @param TRUST_ANCHOR the type representing a trust anchor
  */
 public fun interface TrustAnchorCreator<in CERT : Any, out TRUST_ANCHOR : Any> {
-    public fun invoke(cert: CERT): TRUST_ANCHOR
+    public operator fun invoke(cert: CERT): TRUST_ANCHOR
 
     public companion object
 }
