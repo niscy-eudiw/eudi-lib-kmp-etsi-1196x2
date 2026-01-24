@@ -114,7 +114,7 @@ fun buildLoTLTrust(
 
 data class DssLoadAndTrust private constructor(
     val dssLoader: DSSLoader,
-    val isChainTrustedForContext: DefaultIsChainTrustedForContext<List<X509Certificate>, TrustAnchor>,
+    val isChainTrustedForContext: IsChainTrustedForContext<List<X509Certificate>, TrustAnchor>,
 ) {
     companion object {
         operator fun invoke(
@@ -130,7 +130,7 @@ data class DssLoadAndTrust private constructor(
             }
             return DssLoadAndTrust(
                 dssLoader,
-                IsChainTrustedForContext.forLoTLUsingDSS(validateCertificateChain, config, dssLoader),
+                IsChainTrustedForContext.usingLoTL(validateCertificateChain, config, dssLoader),
             )
         }
     }
@@ -141,7 +141,7 @@ class DSSLoader(
     private val onlineLoader: DSSCacheFileLoader,
     private val offlineLoader: DSSCacheFileLoader?,
     private val cacheCleaner: CacheCleaner?,
-) : GetTrustedListsCertificateSourceFor {
+) : GetTrustedListsCertificateByTrustSource {
 
     override suspend fun invoke(
         trustSource: TrustSource.LoTL,

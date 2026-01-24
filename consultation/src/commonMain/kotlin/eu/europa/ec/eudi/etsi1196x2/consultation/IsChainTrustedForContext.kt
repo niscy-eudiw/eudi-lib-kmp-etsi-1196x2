@@ -92,7 +92,9 @@ public sealed interface VerificationContext {
  * @param CHAIN type representing a certificate chain
  * @param TRUST_ANCHOR type representing a trust anchor
  */
-public fun interface IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any> {
+public class IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any>(
+    public val trust: Map<VerificationContext, IsChainTrusted<CHAIN, TRUST_ANCHOR>>,
+) {
 
     /**
      * Check certificate chain is trusted in the context of
@@ -105,30 +107,17 @@ public fun interface IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR :
     public suspend operator fun invoke(
         chain: CHAIN,
         verificationContext: VerificationContext,
-    ): CertificationChainValidation<TRUST_ANCHOR>?
-
-    public companion object {
-
-        public fun <CHAIN : Any, TRUST_ANCHOR : Any> default(
-            trust: Map<VerificationContext, IsChainTrusted<CHAIN, TRUST_ANCHOR>>,
-        ): DefaultIsChainTrustedForContext<CHAIN, TRUST_ANCHOR> = DefaultIsChainTrustedForContext(trust)
-    }
-}
-
-public class DefaultIsChainTrustedForContext<CHAIN : Any, TRUST_ANCHOR : Any>(
-    private val trust: Map<VerificationContext, IsChainTrusted<CHAIN, TRUST_ANCHOR>>,
-) : IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> {
-
-    override suspend fun invoke(
-        chain: CHAIN,
-        verificationContext: VerificationContext,
     ): CertificationChainValidation<TRUST_ANCHOR>? = trust[verificationContext]?.invoke(chain)
 
     public operator fun plus(
-        other: DefaultIsChainTrustedForContext<CHAIN, TRUST_ANCHOR>,
-    ): DefaultIsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
-        DefaultIsChainTrustedForContext(trust + other.trust)
-}
+        other: IsChainTrustedForContext<@UnsafeVariance CHAIN, @UnsafeVariance TRUST_ANCHOR>,
+    ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
+        IsChainTrustedForContext(trust + other.trust)
 
-public inline fun <C1 : Any, TA : Any, C2 : Any> IsChainTrustedForContext<C1, TA>.contraMap(crossinline f: (C2) -> C1): IsChainTrustedForContext<C2, TA> =
-    IsChainTrustedForContext { chain, verificationContext -> invoke(f(chain), verificationContext) }
+    public inline fun <C1 : Any> contraMap(crossinline f: (C1) -> CHAIN): IsChainTrustedForContext<C1, TRUST_ANCHOR> =
+        IsChainTrustedForContext(
+            trust.mapValues { (_, value) -> value.contraMap(f) },
+        )
+
+    public companion object
+}

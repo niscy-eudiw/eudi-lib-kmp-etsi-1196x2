@@ -19,7 +19,7 @@ import eu.europa.esig.dss.spi.tsl.TrustedListsCertificateSource
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 
-public fun IsChainTrusted.Companion.forLoTLUsingDSS(
+public fun IsChainTrusted.Companion.usingLoTL(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.trustAnchorCreator(),
     getTrustedListsCertificateSource: suspend () -> TrustedListsCertificateSource,
@@ -29,23 +29,23 @@ public fun IsChainTrusted.Companion.forLoTLUsingDSS(
         source.certificates.orEmpty().map { trustAnchorCreator(it.certificate) }
     }
 
-public fun IsChainTrustedForContext.Companion.forLoTLUsingDSS(
+public fun IsChainTrustedForContext.Companion.usingLoTL(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     config: Map<VerificationContext, Pair<TrustSource.LoTL, TrustAnchorCreator<X509Certificate, TrustAnchor>?>>,
-    getTrustedListsCertificateSourceFor: GetTrustedListsCertificateSourceFor,
-): DefaultIsChainTrustedForContext<List<X509Certificate>, TrustAnchor> {
+    getTrustedListsCertificateByTrustSource: GetTrustedListsCertificateByTrustSource,
+): IsChainTrustedForContext<List<X509Certificate>, TrustAnchor> {
     val trust = config.mapValues { (_, value) ->
         val (trustSource, trustAnchorCreator) = value
-        IsChainTrusted.forLoTLUsingDSS(
+        IsChainTrusted.usingLoTL(
             validateCertificateChain,
             trustAnchorCreator ?: JvmSecurity.trustAnchorCreator(),
         ) {
-            getTrustedListsCertificateSourceFor(trustSource)
+            getTrustedListsCertificateByTrustSource(trustSource)
         }
     }
-    return DefaultIsChainTrustedForContext(trust)
+    return IsChainTrustedForContext(trust)
 }
 
-public fun interface GetTrustedListsCertificateSourceFor {
+public fun interface GetTrustedListsCertificateByTrustSource {
     public suspend operator fun invoke(trustSource: TrustSource.LoTL): TrustedListsCertificateSource
 }
