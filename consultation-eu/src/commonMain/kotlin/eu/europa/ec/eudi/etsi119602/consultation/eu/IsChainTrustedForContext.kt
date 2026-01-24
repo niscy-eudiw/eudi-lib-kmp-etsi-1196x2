@@ -24,14 +24,9 @@ import eu.europa.ec.eudi.etsi119602.consultation.TrustSource
  * in the context of a specific [verification][VerificationContext]
  *
  * @param CHAIN type representing a certificate chain
+ * @param TRUST_ANCHOR type representing a trust anchor
  */
-public fun interface IsChainTrustedForContext<in CHAIN : Any> {
-
-    public sealed interface Outcome {
-        public data object Trusted : Outcome
-        public data class NotTrusted(val cause: Throwable) : Outcome
-        public data object UnsupportedVerificationContext : Outcome
-    }
+public fun interface IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any> {
 
     /**
      * Check certificate chain is trusted in the context of
@@ -44,30 +39,21 @@ public fun interface IsChainTrustedForContext<in CHAIN : Any> {
     public suspend operator fun invoke(
         chain: CHAIN,
         verificationContext: VerificationContext,
-    ): Outcome
+    ): CertificationChainValidation<TRUST_ANCHOR>?
 
     public companion object {
 
         public operator fun <CHAIN : Any, TRUST_ANCHOR : Any> invoke(
             trustSourcePerVerificationContext: (VerificationContext) -> TrustSource?,
             sources: Map<TrustSource, IsChainTrusted<CHAIN, TRUST_ANCHOR>>,
-        ): IsChainTrustedForContext<CHAIN> =
+        ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
             IsChainTrustedForContext { chain, verificationContext ->
-                when (val trustSource = trustSourcePerVerificationContext(verificationContext)) {
-                    null -> Outcome.UnsupportedVerificationContext
-                    else -> {
-                        when (val isChainTrusted = sources[trustSource]) {
-                            null -> Outcome.UnsupportedVerificationContext
-                            else -> when (val validation = isChainTrusted(chain)) {
-                                is CertificationChainValidation.Trusted -> Outcome.Trusted
-                                is CertificationChainValidation.NotTrusted -> Outcome.NotTrusted(validation.cause)
-                            }
-                        }
-                    }
-                }
+                trustSourcePerVerificationContext(verificationContext)
+                    ?.let { trustSource -> sources[trustSource] }
+                    ?.invoke(chain)
             }
     }
 }
 
-public inline fun <C1 : Any, C2 : Any> IsChainTrustedForContext<C1>.contraMap(crossinline f: (C2) -> C1): IsChainTrustedForContext<C2> =
+public inline fun <C1 : Any, TA : Any, C2 : Any> IsChainTrustedForContext<C1, TA>.contraMap(crossinline f: (C2) -> C1): IsChainTrustedForContext<C2, TA> =
     IsChainTrustedForContext { chain, verificationContext -> invoke(f(chain), verificationContext) }

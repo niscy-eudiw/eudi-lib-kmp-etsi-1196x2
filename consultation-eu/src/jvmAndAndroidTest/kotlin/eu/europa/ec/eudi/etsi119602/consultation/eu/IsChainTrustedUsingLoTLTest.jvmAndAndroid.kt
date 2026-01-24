@@ -39,6 +39,7 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 object EUDIDev {
     val pubEEASource = TrustSource.LoTL(
@@ -101,7 +102,7 @@ class IsChainTrustedUsingLoTLTest {
 
     @Test
     fun verifyThatPidX5CIsTrustedForPIDContext() = runTest {
-        assertIs<IsChainTrustedForContext.Outcome.Trusted>(
+        assertIs<CertificationChainValidation.Trusted<TrustAnchor>>(
             isChainTrusted(pidX5c, VerificationContext.PID),
         )
     }
@@ -110,17 +111,14 @@ class IsChainTrustedUsingLoTLTest {
     @Test
     @Ignore("This is not passing")
     fun verifyThatPidX5CIsNotTrustedForPubEAAContext() = runTest {
-        assertIs<IsChainTrustedForContext.Outcome.NotTrusted>(
+        assertIs<CertificationChainValidation.NotTrusted>(
             isChainTrusted(pidX5c, VerificationContext.PubEAA),
-        )
-        assertIs<IsChainTrustedForContext.Outcome.UnsupportedVerificationContext>(
-            isChainTrusted(pidX5c, VerificationContext.WalletUnitAttestation),
         )
     }
 
     @Test
     fun verifyThatPidX5CFailsForAnUnsupportedContext() = runTest {
-        assertIs<IsChainTrustedForContext.Outcome.UnsupportedVerificationContext>(
+        assertNull(
             isChainTrusted(pidX5c, VerificationContext.WalletUnitAttestation),
         )
     }
@@ -137,6 +135,7 @@ class IsChainTrustedUsingLoTLTest {
     }
 }
 
+@Suppress("SameParameterValue")
 private fun fetchLoTL(lotlUrl: String, serviceType: String?): TrustedListsCertificateSource {
     val trustedListsCertificateSource = TrustedListsCertificateSource()
 
