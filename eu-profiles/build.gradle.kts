@@ -81,8 +81,8 @@ kotlin {
         commonMain {
             dependencies {
                 // Common dependencies
-                api(libs.kotlinx.coroutines.core)
-                api(libs.kotlinx.datetime)
+                api(projects.eudiLibKmpEtsi119602DataModel)
+                api(projects.eudiLibKmpEtsi1196x2Consultation)
             }
         }
 
@@ -90,17 +90,22 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.serialization)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.json)
             }
         }
-        val jvmAndAndroidMain by getting {
+
+        val jvmAndAndroidTest by getting {
             dependencies {
-                implementation(libs.dss.jades)
-                implementation(libs.dss.validation)
-                implementation(libs.dss.policy.jaxb)
-                implementation(libs.dss.service)
-                implementation(libs.dss.tsl.validation)
-                implementation(libs.dss.utils)
-                implementation(libs.dss.utils.guava)
+                implementation(libs.ktor.client.java)
+            }
+        }
+
+        androidUnitTest {
+            dependencies {
+                implementation(libs.ktor.client.okhttp)
             }
         }
     }
@@ -118,7 +123,7 @@ android {
 
     sourceSets {
         getByName("test") {
-            resources.srcDirs("src/commonTest/resources")
+            resources.srcDirs("src/jvmAndAndroidTest/resources")
         }
     }
 
@@ -170,8 +175,7 @@ tasks.withType<DokkaTask>().configureEach {
 
             val remoteSourceUrl =
                 System.getenv()["GIT_REF_NAME"]?.let {
-                    URI.create("${properties["POM_SCM_URL"]}/tree/$it/${project.layout.projectDirectory.asFile.name}/src")
-                        .toURL()
+                    URI.create("${properties["POM_SCM_URL"]}/tree/$it/${project.layout.projectDirectory.asFile.name}/src").toURL()
                 }
             remoteSourceUrl
                 ?.let {
@@ -196,7 +200,7 @@ mavenPublishing {
 
     coordinates(
         groupId = group.toString(),
-        artifactId = "eudi-lib-kmp-etsi-1196x2-consultation",
+        artifactId = "eudi-lib-kmp-etsi-119602-eu-profiles",
         version = version.toString(),
     )
 
