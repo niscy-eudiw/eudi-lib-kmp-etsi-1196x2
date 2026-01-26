@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2023 European Commission
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
 import eu.europa.ec.eudi.etsi1196x2.consultation.GetTrustAnchors
@@ -7,48 +22,84 @@ import eu.europa.ec.eudi.etsi1196x2.consultation.dss.AsyncCache.Entry
 import eu.europa.esig.dss.spi.tsl.TrustedListsCertificateSource
 import eu.europa.esig.dss.tsl.source.LOTLSource
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
+import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 
+/**
+ * Defines a functional interface for retrieving a trusted lists certificate source
+ * using a specified LOTLSource.
+ *
+ * The interface provides a method to asynchronously fetch a [TrustedListsCertificateSource]
+ * based on the provided [LOTLSource]. It includes a companion object for creating an instance
+ * using blocking logic wrapped in a coroutine-friendly structure.
+ */
 public fun interface GetTrustedListsCertificateByLOTLSource {
+
+    /**
+     * Retrieves a trusted lists certificate source based on the provided [LOTLSource].
+     * @param trustSource the LOTLSource to use for fetching the certificate source
+     * @return the [TrustedListsCertificateSource]
+     */
     public suspend operator fun invoke(trustSource: LOTLSource): TrustedListsCertificateSource
 
     public companion object {
+        /**
+         * Creates a [GetTrustedListsCertificateByLOTLSource] instance from blocking logic.
+         *
+         * @param coroutineScope the coroutine coroutineScope for executing the blocking logic
+         * @param coroutineDispatcher the coroutine coroutineDispatcher for executing the blocking logic
+         * @param expectedTrustSourceNo the expected number of trust sources
+         * @param ttl the time-to-live duration for caching the certificate source
+         * @param block the blocking function to retrieve the certificate source
+         * @return the [GetTrustedListsCertificateByLOTLSource] instance
+         */
         public fun fromBlocking(
-            scope: CoroutineScope,
+            coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            clock: Clock = Clock.System,
+            ttl: Duration,
             expectedTrustSourceNo: Int,
-            ttl: Duration = 10.minutes,
             block: (LOTLSource) -> TrustedListsCertificateSource,
         ): GetTrustedListsCertificateByLOTLSource =
-            GetTrustedListsCertificateByLOTLSourceBlocking(scope, expectedTrustSourceNo, ttl, block)
+            GetTrustedListsCertificateByLOTLSourceBlocking(
+                coroutineScope,
+                coroutineDispatcher,
+                clock,
+                ttl,
+                expectedTrustSourceNo,
+                block,
+            )
     }
 }
 
 public fun GetTrustedListsCertificateByLOTLSource.asGetTrustAnchors(
     trustSource: LOTLSource,
-    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.trustAnchorCreator()
+    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.trustAnchorCreator(),
 ): GetTrustAnchors<TrustAnchor> =
     GetTrustAnchors {
         invoke(trustSource).trustAnchors(trustAnchorCreator)
     }
 
 internal fun TrustedListsCertificateSource.trustAnchors(
-    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor>
+    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor>,
 ): List<TrustAnchor> = certificates.map { trustAnchorCreator(it.certificate) }
-
 
 internal class GetTrustedListsCertificateByLOTLSourceBlocking(
     scope: CoroutineScope,
+    dispatcher: CoroutineDispatcher,
+    clock: Clock,
+    ttl: Duration,
     expectedTrustSourceNo: Int,
-    ttl: Duration = 10.minutes,
     block: (LOTLSource) -> TrustedListsCertificateSource,
 ) : GetTrustedListsCertificateByLOTLSource {
 
     private val cached: AsyncCache<LOTLSource, TrustedListsCertificateSource> =
-        AsyncCache(scope, expectedTrustSourceNo, ttl) { trustSource ->
-            withContext(Dispatchers.IO) {
+        AsyncCache(scope, dispatcher, clock, ttl, expectedTrustSourceNo) { trustSource ->
+            withContext(dispatcher) {
                 block(trustSource)
             }
         }
@@ -57,38 +108,50 @@ internal class GetTrustedListsCertificateByLOTLSourceBlocking(
 }
 
 internal class AsyncCache<A : Any, B : Any>(
-    private val scope: CoroutineScope,
-    private val maxCacheSize: Int,
+    coroutineScope: CoroutineScope,
+    private val coroutineDispatcher: CoroutineDispatcher,
+    private val clock: Clock = Clock.System,
     private val ttl: Duration,
+    private val maxCacheSize: Int,
     private val supplier: suspend (A) -> B,
 ) : suspend (A) -> B {
 
+    private val scope = coroutineScope + SupervisorJob(coroutineScope.coroutineContext[Job])
+
     private data class Entry<B>(val deferred: Deferred<B>, val createdAt: Long)
 
+    private val mutex = Mutex()
     private val cache = object : LinkedHashMap<A, Entry<B>>(maxCacheSize, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<A, Entry<B>>) = size > maxCacheSize
     }
 
     override suspend fun invoke(key: A): B {
-        val now = System.currentTimeMillis()
-        val entry = synchronized(cache) {
+        val now = clock.now().toEpochMilliseconds()
+        val entry = mutex.withLock {
             val existing = cache[key]
             if (existing != null && (now - existing.createdAt) < ttl.inWholeMilliseconds) {
                 existing
             } else {
                 // Launch new computation
-                val newDeferred = scope.async(Dispatchers.IO) {
-                    try {
-                        supplier(key)
-                    } catch (e: Exception) {
-                        // Evict on failure so next call retries
-                        synchronized(cache) { cache.remove(key) }
-                        throw e
-                    }
+                val newDeferred = scope.async(coroutineDispatcher) {
+                    supplier(key)
                 }
                 Entry(newDeferred, now).also { cache[key] = it }
             }
         }
-        return entry.deferred.await()
+        return try {
+            entry.deferred.await()
+        } catch (e: Exception) {
+            handleFailure(key, entry)
+            throw e
+        }
+    }
+
+    private suspend fun handleFailure(key: A, entry: Entry<B>) {
+        mutex.withLock {
+            if (cache[key] === entry) {
+                cache.remove(key)
+            }
+        }
     }
 }

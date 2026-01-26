@@ -28,6 +28,7 @@ import eu.europa.esig.dss.tsl.cache.CacheCleaner
 import eu.europa.esig.dss.tsl.job.TLValidationJob
 import eu.europa.esig.dss.tsl.source.LOTLSource
 import eu.europa.esig.dss.tsl.sync.ExpirationAndSignatureCheckStrategy
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,7 +42,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaInstant
 
 class DSSLoader(
-    private val sourcePerVerification: Map<VerificationContext,LOTLSource>,
+    private val sourcePerVerification: Map<VerificationContext, LOTLSource>,
     private val onlineLoader: DSSCacheFileLoader,
     private val offlineLoader: DSSCacheFileLoader?,
     private val cacheCleaner: CacheCleaner?,
@@ -85,10 +86,9 @@ class DSSLoader(
             cacheCleaner?.let { setCacheCleaner(it) }
         }
 
-
-
     fun isChainTrustedForContext(
-        scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+        coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+        coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
         clock: Clock = Clock.System,
         ttl: Duration = 10.minutes,
         revocationEnabled: Boolean = false,
@@ -100,9 +100,11 @@ class DSSLoader(
             }
         val getTrustedListsCertificateByLOTLSource =
             GetTrustedListsCertificateByLOTLSource.fromBlocking(
-                scope = scope,
+                coroutineScope = coroutineScope,
+                coroutineDispatcher = coroutineDispatcher,
                 expectedTrustSourceNo = sourcePerVerification.size,
                 ttl = ttl,
+                clock = clock,
                 block = ::trustedListsCertificateSourceOf,
             )
 
@@ -114,11 +116,10 @@ class DSSLoader(
         return IsChainTrustedForContext(trust)
     }
 
-
     companion object {
         operator fun invoke(
             cacheDir: Path,
-            sourcePerVerification: Map<VerificationContext,LOTLSource>,
+            sourcePerVerification: Map<VerificationContext, LOTLSource>,
         ): DSSLoader {
             val tlCacheDirectory = cacheDir.toFile()
             val offlineLoader: DSSCacheFileLoader = FileCacheDataLoader().apply {

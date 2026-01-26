@@ -23,6 +23,16 @@ import eu.europa.esig.dss.spi.tsl.TrustedListsCertificateSource
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 
+/**
+ * Creates an instance of [IsChainTrusted] using a trusted list of trust anchors (LoTL).
+ *
+ * @param validateCertificateChain the function used to validate a given certificate chain
+ * @param trustAnchorCreator a function that creates a trust anchor from a certificate
+ * @param getTrustedListsCertificateSource a suspend function that retrieves the trusted lists certificate source containing trust anchors
+ * @return an [IsChainTrusted] instance configured to validate certificate chains using the provided trusted list
+ *
+ * @see GetTrustedListsCertificateByLOTLSource
+ */
 public fun IsChainTrusted.Companion.usingLoTL(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
     trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.trustAnchorCreator(),
@@ -31,4 +41,3 @@ public fun IsChainTrusted.Companion.usingLoTL(
     IsChainTrusted(validateCertificateChain) {
         getTrustedListsCertificateSource().trustAnchors(trustAnchorCreator)
     }
-

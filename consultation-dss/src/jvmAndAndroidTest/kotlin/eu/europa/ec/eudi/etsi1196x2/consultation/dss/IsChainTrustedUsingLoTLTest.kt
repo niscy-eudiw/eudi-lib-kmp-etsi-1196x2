@@ -16,14 +16,14 @@
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
 import eu.europa.ec.eudi.etsi1196x2.consultation.CertificationChainValidation
+import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
 import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
 import eu.europa.esig.dss.tsl.function.TLPredicateFactory
 import eu.europa.esig.dss.tsl.function.TypeOtherTSLPointer
 import eu.europa.esig.dss.tsl.function.XMLOtherTSLPointer
 import eu.europa.esig.dss.tsl.source.LOTLSource
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
 import java.nio.file.Files.createTempDirectory
@@ -36,6 +36,7 @@ import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.seconds
 
 object EUDIRefDevEnv {
 
@@ -61,15 +62,24 @@ object EUDIRefDevEnv {
         return lotlSource
     }
 
-    private val dssLoader: DSSLoader = DSSLoader.invoke(
-        cacheDir = createTempDirectory("lotl-cache"),
-        sourcePerVerification = buildMap {
-            put(VerificationContext.PID, lotlSource(PID_SVC_TYPE))
-            put(VerificationContext.PubEAA, lotlSource(PUB_EAA_SVC_TYPE))
-        }
-    )
+    private val dssLoader: DSSLoader by lazy {
+        DSSLoader(
+            cacheDir = createTempDirectory("lotl-cache"),
+            sourcePerVerification = buildMap {
+                put(VerificationContext.PID, lotlSource(PID_SVC_TYPE))
+                put(VerificationContext.PubEAA, lotlSource(PUB_EAA_SVC_TYPE))
+            },
+        )
+    }
 
-    val isChainTrustedForContext = dssLoader.isChainTrustedForContext(revocationEnabled = true)
+    val isChainTrustedForContext: IsChainTrustedForContext<List<X509Certificate>, TrustAnchor> by lazy {
+        dssLoader.isChainTrustedForContext(
+            coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+            coroutineDispatcher = Dispatchers.IO,
+            ttl = 30.seconds,
+            revocationEnabled = false,
+        )
+    }
 }
 
 class IsChainTrustedUsingLoTLTest {
