@@ -57,23 +57,26 @@ public fun interface GetTrustedListsCertificateByTrustSource {
     public companion object {
         public fun fromBlocking(
             scope: CoroutineScope,
-            maxCacheSize: Int,
+            expectedTrustSourceNo: Int,
+            ttl: Duration = 10.minutes,
             block: (TrustSource.LoTL) -> TrustedListsCertificateSource,
         ): GetTrustedListsCertificateByTrustSource =
-            GetTrustedListsCertificateByTrustSourceBlocking(scope, maxCacheSize, block)
+            GetTrustedListsCertificateByTrustSourceBlocking(scope, expectedTrustSourceNo, ttl, block)
     }
 }
 
 internal class GetTrustedListsCertificateByTrustSourceBlocking(
     scope: CoroutineScope,
-    maxCacheSize: Int,
+    expectedTrustSourceNo: Int,
+    ttl: Duration = 10.minutes,
     block: (TrustSource.LoTL) -> TrustedListsCertificateSource,
 ) : GetTrustedListsCertificateByTrustSource {
 
     private val cached =
         AsyncCache<TrustSource.LoTL, TrustedListsCertificateSource>(
             scope = scope,
-            maxCacheSize = maxCacheSize,
+            maxCacheSize = expectedTrustSourceNo,
+            ttl = ttl,
         ) { trustSource -> withContext(Dispatchers.IO) { block(trustSource) } }
 
     override suspend fun invoke(trustSource: TrustSource.LoTL): TrustedListsCertificateSource = cached(trustSource)
@@ -82,7 +85,7 @@ internal class GetTrustedListsCertificateByTrustSourceBlocking(
 internal class AsyncCache<A : Any, B : Any>(
     private val scope: CoroutineScope,
     private val maxCacheSize: Int,
-    private val ttl: Duration = 10.minutes,
+    private val ttl: Duration,
     private val supplier: suspend (A) -> B,
 ) : suspend (A) -> B {
 

@@ -18,6 +18,11 @@ package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 import eu.europa.ec.eudi.etsi1196x2.consultation.CertificationChainValidation
 import eu.europa.ec.eudi.etsi1196x2.consultation.TrustSource
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
+import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
+import eu.europa.esig.dss.tsl.function.TLPredicateFactory
+import eu.europa.esig.dss.tsl.function.TypeOtherTSLPointer
+import eu.europa.esig.dss.tsl.function.XMLOtherTSLPointer
+import eu.europa.esig.dss.tsl.source.LOTLSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -26,6 +31,7 @@ import java.nio.file.Files
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
+import java.util.function.Predicate
 import kotlin.io.encoding.Base64
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -49,9 +55,24 @@ object EUDIDev {
 
     val dssLoaderAndTrust =
         buildLoTLTrust(revocationEnabled = false, cacheDir = cacheDir) {
-            put(VerificationContext.PID, pidProviderSource to LOTL_URL)
-            put(VerificationContext.PubEAA, pubEEASource to LOTL_URL)
+            put(VerificationContext.PID, pidProviderSource.lotlSource(LOTL_URL))
+            put(VerificationContext.PubEAA, pubEEASource.lotlSource(LOTL_URL))
         }
+
+    private fun TrustSource.LoTL.lotlSource(lotlUrl: String): Pair<TrustSource.LoTL, LOTLSource> {
+        val lotlSource = LOTLSource().apply {
+            lotlPredicate = TLPredicateFactory.createEULOTLPredicate()
+            tlPredicate = TypeOtherTSLPointer(tlType).and(XMLOtherTSLPointer())
+            url = lotlUrl
+            trustAnchorValidityPredicate = GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate()
+            tlVersions = listOf(5, 6)
+            trustServicePredicate =
+                Predicate { tspServiceType ->
+                    tspServiceType.serviceInformation.serviceTypeIdentifier == serviceType
+                }
+        }
+        return this to lotlSource
+    }
 }
 
 class IsChainTrustedUsingLoTLTest {
@@ -88,8 +109,22 @@ class IsChainTrustedUsingLoTLTest {
 
         buildList {
             repeat(200) {
-                add(async { isChainTrustedForContext(pidX5c, VerificationContext.PID).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") } })
-                add(async { isChainTrustedForContext(pidX5c, VerificationContext.PubEAA).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") } })
+                add(
+                    async {
+                        isChainTrustedForContext(
+                            pidX5c,
+                            VerificationContext.PID,
+                        ).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") }
+                    },
+                )
+                add(
+                    async {
+                        isChainTrustedForContext(
+                            pidX5c,
+                            VerificationContext.PubEAA,
+                        ).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") }
+                    },
+                )
             }
         }.awaitAll()
     }
