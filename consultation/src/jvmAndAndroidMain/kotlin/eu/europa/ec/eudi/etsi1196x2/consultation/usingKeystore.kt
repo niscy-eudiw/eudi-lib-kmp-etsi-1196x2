@@ -16,8 +16,6 @@
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.security.KeyStore
 import java.security.cert.TrustAnchor
@@ -37,31 +35,21 @@ public fun IsChainTrusted.Companion.usingKeystore(
     filterAliases: (String) -> Boolean = { true },
     getKeystore: suspend () -> KeyStore,
 ): IsChainTrusted<List<X509Certificate>, TrustAnchor> {
-    val getTrustAnchorsFromKeystore = GetTrustAnchorsFromKeystore(trustAnchorCreator, filterAliases, getKeystore)
+    val getTrustAnchorsFromKeystore = getTrustAnchorsFromKeystore(trustAnchorCreator, filterAliases, getKeystore)
     return IsChainTrusted.Companion(validateCertificateChain, getTrustAnchorsFromKeystore)
 }
 
-internal class GetTrustAnchorsFromKeystore(
-    private val trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor>,
-    private val filterAliases: (String) -> Boolean,
-    private val getKeystore: suspend () -> KeyStore,
-) : suspend () -> List<TrustAnchor> {
-
-    private val readKeystore = Mutex()
-    private var trustAnchors: List<TrustAnchor>? = null
-
-    private suspend fun readTrustAnchors(): List<TrustAnchor> =
-        withContext(Dispatchers.IO) {
-            val keystore = getKeystore()
-            keystore.aliases().toList().filter(filterAliases).mapNotNull { alias ->
-                val cert = (keystore.getCertificate(alias) as? X509Certificate)
-                cert?.let(trustAnchorCreator::invoke)
-            }
+internal fun getTrustAnchorsFromKeystore(
+    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor>,
+    filterAliases: (String) -> Boolean,
+    getKeystore: suspend () -> KeyStore,
+): GetTrustAnchors<TrustAnchor> = GetTrustAnchors.once {
+    withContext(Dispatchers.IO) {
+        val keystore = getKeystore()
+        keystore.aliases().toList().filter(filterAliases).mapNotNull { alias ->
+            val cert = (keystore.getCertificate(alias) as? X509Certificate)
+            cert?.let(trustAnchorCreator::invoke)
         }
-
-    override suspend fun invoke(): List<TrustAnchor> =
-        trustAnchors ?: readKeystore.withLock {
-            // check again in case another thread read the keystore before us
-            trustAnchors ?: readTrustAnchors().also { trustAnchors = it }
-        }
+    }
 }
+

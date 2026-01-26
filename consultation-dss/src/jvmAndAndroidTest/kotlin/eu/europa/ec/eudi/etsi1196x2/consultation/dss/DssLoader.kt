@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
+import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrusted
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainJvm
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
@@ -35,66 +36,12 @@ import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 import java.sql.Date
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaInstant
 
-@Suppress("SameParameterValue")
-fun buildLoTLTrust(
-    clock: Clock = Clock.System,
-    scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    cacheDir: Path,
-    revocationEnabled: Boolean = false,
-    builder: MutableMap<VerificationContext, LOTLSource>.() -> Unit,
-): DssLoadAndTrust = DssLoadAndTrust(
-    clock,
-    scope,
-    cacheDir,
-    revocationEnabled,
-    buildMap(builder),
-)
-
-data class DssLoadAndTrust private constructor(
-    val dssLoader: DSSLoader,
-    val isChainTrustedForContext: IsChainTrustedForContext<List<X509Certificate>, TrustAnchor>,
-) {
-    companion object {
-        operator fun invoke(
-            clock: Clock = Clock.System,
-            scope: CoroutineScope,
-            cacheDir: Path,
-            revocationEnabled: Boolean = false,
-            instructions: Map<VerificationContext, LOTLSource>,
-        ): DssLoadAndTrust {
-            val dssLoader =
-                DSSLoader.invoke(cacheDir, instructions.values.toList())
-
-            val isChainTrustedForContext = run {
-                val validateCertificateChain =
-                    ValidateCertificateChainJvm {
-                        isRevocationEnabled = revocationEnabled
-                        date = Date.from(clock.now().toJavaInstant())
-                    }
-                val getTrustedListsCertificateByLOTLSource =
-                    GetTrustedListsCertificateByLOTLSource.fromBlocking(
-                        scope = scope,
-                        expectedTrustSourceNo = instructions.size,
-                        ttl = 10.minutes,
-                        block = dssLoader::trustedListsCertificateSourceOf,
-                    )
-                IsChainTrustedForContext.usingLoTL(
-                    validateCertificateChain,
-                    instructions.mapValues { (_, lotlSource) -> lotlSource to null },
-                    getTrustedListsCertificateByLOTLSource,
-                )
-            }
-
-            return DssLoadAndTrust(dssLoader, isChainTrustedForContext)
-        }
-    }
-}
-
 class DSSLoader(
-    private val lotlLocationPerSource: List<LOTLSource>,
+    private val sourcePerVerification: Map<VerificationContext,LOTLSource>,
     private val onlineLoader: DSSCacheFileLoader,
     private val offlineLoader: DSSCacheFileLoader?,
     private val cacheCleaner: CacheCleaner?,
@@ -103,7 +50,7 @@ class DSSLoader(
     fun trustedListsCertificateSourceOf(
         lotlSource: LOTLSource,
     ): TrustedListsCertificateSource {
-        require(lotlSource in lotlLocationPerSource) { "Not configured $lotlSource" }
+        require(lotlSource in sourcePerVerification.values) { "Not configured $lotlSource" }
         return TrustedListsCertificateSource().also { source ->
             validationJob(lotlSource, source).refresh()
         }
@@ -128,19 +75,50 @@ class DSSLoader(
     private fun validationJob(
         lotlSource: LOTLSource,
         source: TrustedListsCertificateSource,
-    ) = TLValidationJob().apply {
-        setListOfTrustedListSources(lotlSource)
-        setOnlineDataLoader(onlineLoader)
-        setTrustedListCertificateSource(source)
-        setSynchronizationStrategy(ExpirationAndSignatureCheckStrategy())
-        offlineLoader?.let { setOfflineDataLoader(it) }
-        cacheCleaner?.let { setCacheCleaner(it) }
+    ): TLValidationJob =
+        TLValidationJob().apply {
+            setListOfTrustedListSources(lotlSource)
+            setOnlineDataLoader(onlineLoader)
+            setTrustedListCertificateSource(source)
+            setSynchronizationStrategy(ExpirationAndSignatureCheckStrategy())
+            offlineLoader?.let { setOfflineDataLoader(it) }
+            cacheCleaner?.let { setCacheCleaner(it) }
+        }
+
+
+
+    fun isChainTrustedForContext(
+        scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+        clock: Clock = Clock.System,
+        ttl: Duration = 10.minutes,
+        revocationEnabled: Boolean = false,
+    ): IsChainTrustedForContext<List<X509Certificate>, TrustAnchor> {
+        val validateCertificateChain =
+            ValidateCertificateChainJvm {
+                isRevocationEnabled = revocationEnabled
+                date = Date.from(clock.now().toJavaInstant())
+            }
+        val getTrustedListsCertificateByLOTLSource =
+            GetTrustedListsCertificateByLOTLSource.fromBlocking(
+                scope = scope,
+                expectedTrustSourceNo = sourcePerVerification.size,
+                ttl = ttl,
+                block = ::trustedListsCertificateSourceOf,
+            )
+
+        val trust = sourcePerVerification.mapValues { (_, lotlSource) ->
+            val provider = getTrustedListsCertificateByLOTLSource.asGetTrustAnchors(lotlSource)
+            IsChainTrusted(validateCertificateChain, provider)
+        }
+
+        return IsChainTrustedForContext(trust)
     }
+
 
     companion object {
         operator fun invoke(
             cacheDir: Path,
-            lotlLocationPerSource: List<LOTLSource>,
+            sourcePerVerification: Map<VerificationContext,LOTLSource>,
         ): DSSLoader {
             val tlCacheDirectory = cacheDir.toFile()
             val offlineLoader: DSSCacheFileLoader = FileCacheDataLoader().apply {
@@ -160,7 +138,7 @@ class DSSLoader(
                 setCleanFileSystem(true)
                 setDSSFileLoader(offlineLoader)
             }
-            return DSSLoader(lotlLocationPerSource, onlineLoader, offlineLoader, cacheCleaner)
+            return DSSLoader(sourcePerVerification, onlineLoader, offlineLoader, cacheCleaner)
         }
     }
 }

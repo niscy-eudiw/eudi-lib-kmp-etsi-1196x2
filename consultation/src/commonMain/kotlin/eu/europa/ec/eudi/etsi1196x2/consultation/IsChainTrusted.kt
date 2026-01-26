@@ -45,7 +45,7 @@ public sealed interface IsChainTrusted<in CHAIN : Any, out TRUST_ANCHOR : Any> {
          */
         public operator fun <CHAIN : Any, TRUST_ANCHOR : Any> invoke(
             validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
-            getTrustAnchors: suspend () -> List<TRUST_ANCHOR>,
+            getTrustAnchors: GetTrustAnchors<TRUST_ANCHOR>,
         ): IsChainTrusted<CHAIN, TRUST_ANCHOR> = IsChainTrustedDefault(validateCertificateChain, getTrustAnchors)
     }
 }
@@ -68,15 +68,14 @@ public fun <C2 : Any, C1 : Any, TC : Any> IsChainTrusted<C1, TC>.contraMap(
  */
 public infix fun <C1 : Any, TC : Any> IsChainTrusted<C1, TC>.or(
     other: IsChainTrusted<C1, TC>,
-): IsChainTrusted<C1, TC> =
-    IsChainTrustedWithAlternative(this, other)
+): IsChainTrusted<C1, TC> = IsChainTrustedWithAlternative(this, other)
 
 //
 // Implementations
 //
 private class IsChainTrustedDefault<in CHAIN : Any, out TRUST_ANCHOR : Any>(
     private val validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
-    private val getTrustAnchors: suspend () -> List<TRUST_ANCHOR>,
+    private val getTrustAnchors: GetTrustAnchors<TRUST_ANCHOR>,
 ) : IsChainTrusted<CHAIN, TRUST_ANCHOR> {
 
     override suspend fun invoke(chain: CHAIN): CertificationChainValidation<TRUST_ANCHOR> =

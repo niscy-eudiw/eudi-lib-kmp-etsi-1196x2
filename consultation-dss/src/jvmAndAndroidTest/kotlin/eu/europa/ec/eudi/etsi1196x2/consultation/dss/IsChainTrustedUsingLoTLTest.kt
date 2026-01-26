@@ -26,7 +26,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
-import java.nio.file.Files
+import java.nio.file.Files.createTempDirectory
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
@@ -61,24 +61,26 @@ object EUDIRefDevEnv {
         return lotlSource
     }
 
-    private val cacheDir = Files.createTempDirectory("lotl-cache")
-
-    val dssLoaderAndTrust =
-        buildLoTLTrust(revocationEnabled = false, cacheDir = cacheDir) {
+    private val dssLoader: DSSLoader = DSSLoader.invoke(
+        cacheDir = createTempDirectory("lotl-cache"),
+        sourcePerVerification = buildMap {
             put(VerificationContext.PID, lotlSource(PID_SVC_TYPE))
             put(VerificationContext.PubEAA, lotlSource(PUB_EAA_SVC_TYPE))
         }
+    )
+
+    val isChainTrustedForContext = dssLoader.isChainTrustedForContext(revocationEnabled = true)
 }
 
 class IsChainTrustedUsingLoTLTest {
 
-    val isChainTrustedForContext =
-        EUDIRefDevEnv.dssLoaderAndTrust.isChainTrustedForContext.contraMap(::certsFromX5C)
+    val isX5CTrusted =
+        EUDIRefDevEnv.isChainTrustedForContext.contraMap(::certsFromX5C)
 
     @Test
     fun verifyThatPidX5CIsTrustedForPIDContext() = runTest {
         assertIs<CertificationChainValidation.Trusted<TrustAnchor>>(
-            isChainTrustedForContext(pidX5c, VerificationContext.PID),
+            isX5CTrusted(pidX5c, VerificationContext.PID),
         )
     }
 
@@ -86,40 +88,23 @@ class IsChainTrustedUsingLoTLTest {
     @Ignore("This is not passing because current LoTL contains the same certs for PID and PubEAA service types")
     fun verifyThatPidX5CIsNotTrustedForPubEAAContext() = runTest {
         assertIs<CertificationChainValidation.NotTrusted>(
-            isChainTrustedForContext(pidX5c, VerificationContext.PubEAA),
+            isX5CTrusted(pidX5c, VerificationContext.PubEAA),
         )
     }
 
     @Test
     fun verifyThatPidX5CFailsForAnUnsupportedContext() = runTest {
         assertNull(
-            isChainTrustedForContext(pidX5c, VerificationContext.WalletUnitAttestation),
+            isX5CTrusted(pidX5c, VerificationContext.WalletUnitAttestation),
         )
     }
 
     @Test
     fun checkInParallel() = runTest {
-        val isChainTrustedForContext =
-            EUDIRefDevEnv.dssLoaderAndTrust.isChainTrustedForContext.contraMap(::certsFromX5C)
-
         buildList {
             repeat(200) {
-                add(
-                    async {
-                        isChainTrustedForContext(
-                            pidX5c,
-                            VerificationContext.PID,
-                        ).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") }
-                    },
-                )
-                add(
-                    async {
-                        isChainTrustedForContext(
-                            pidX5c,
-                            VerificationContext.PubEAA,
-                        ).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") }
-                    },
-                )
+                add(async { isX5CTrusted(pidX5c, VerificationContext.PID) })
+                add(async { isX5CTrusted(pidX5c, VerificationContext.PubEAA) })
             }
         }.awaitAll()
     }
