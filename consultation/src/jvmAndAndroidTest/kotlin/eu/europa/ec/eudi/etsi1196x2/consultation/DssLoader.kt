@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
+import eu.europa.ec.eudi.etsi1196x2.consultation.AsyncCache.Entry
 import eu.europa.esig.dss.service.http.commons.CommonsDataLoader
 import eu.europa.esig.dss.service.http.commons.FileCacheDataLoader
 import eu.europa.esig.dss.spi.client.http.DSSCacheFileLoader
@@ -41,7 +42,7 @@ import kotlin.time.toJavaInstant
 fun buildLoTLTrust(
     clock: Clock = Clock.System,
     scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    cacheDir: java.nio.file.Path? = null,
+    cacheDir: Path? = null,
     revocationEnabled: Boolean = false,
     builder: MutableMap<VerificationContext, Pair<TrustSource.LoTL, String>>.() -> Unit,
 ): DssLoadAndTrust = DssLoadAndTrust(
@@ -60,26 +61,43 @@ data class DssLoadAndTrust private constructor(
         operator fun invoke(
             clock: Clock = Clock.System,
             scope: CoroutineScope,
-            cacheDir: java.nio.file.Path? = null,
+            cacheDir: Path? = null,
             revocationEnabled: Boolean = false,
             instructions: Map<VerificationContext, Pair<TrustSource.LoTL, String>>,
         ): DssLoadAndTrust {
-            val dssLoader = DSSLoader(cacheDir, instructions.values.associate { it.first to it.second })
-            val config = instructions.mapValues { it.value.first to null }
-            val validateCertificateChain = ValidateCertificateChainJvm {
-                isRevocationEnabled = revocationEnabled
-                date = Date.from(clock.now().toJavaInstant())
+            val dssLoader = run {
+                val lotlLocationPerSource =
+                    instructions.values.associate { it.first to it.second }
+                DSSLoader(cacheDir, lotlLocationPerSource)
             }
-            val cached = DssLoaderSuspendable(dssLoader, scope, maxCacheSize = config.size)
-            return DssLoadAndTrust(
-                dssLoader,
-                IsChainTrustedForContext.usingLoTL(validateCertificateChain, config, cached),
-            )
+
+            val isChainTrustedForContext = run {
+                val config =
+                    instructions.mapValues { it.value.first to null }
+                val validateCertificateChain =
+                    ValidateCertificateChainJvm {
+                        isRevocationEnabled = revocationEnabled
+                        date = Date.from(clock.now().toJavaInstant())
+                    }
+                val getTrustedListsCertificateByTrustSource =
+                    GetTrustedListsCertificateByTrustSourceUsingDssLoader(
+                        dssLoader,
+                        scope,
+                        config.size,
+                    )
+                IsChainTrustedForContext.usingLoTL(
+                    validateCertificateChain,
+                    config,
+                    getTrustedListsCertificateByTrustSource,
+                )
+            }
+
+            return DssLoadAndTrust(dssLoader, isChainTrustedForContext)
         }
     }
 }
 
-private class DssLoaderSuspendable(
+private class GetTrustedListsCertificateByTrustSourceUsingDssLoader(
     dssLoader: DSSLoader,
     scope: CoroutineScope,
     maxCacheSize: Int,
@@ -108,31 +126,39 @@ class DSSLoader(
     fun trustedListsCertificateSourceOf(
         trustSource: TrustSource.LoTL,
     ): TrustedListsCertificateSource {
-        println("Loading trusted lists for ${trustSource.serviceType}")
+        println("Loading trusted lists for ${trustSource.serviceType}...")
         val lotlUrl = lotlLocationPerSource[trustSource]
         requireNotNull(lotlUrl) { "No location for $trustSource" }
-
         return TrustedListsCertificateSource().also { source ->
-            val validationJob = TLValidationJob().apply {
-                setListOfTrustedListSources(trustSource.lotlSource(lotlUrl))
-                setOnlineDataLoader(onlineLoader)
-                setTrustedListCertificateSource(source)
-                setSynchronizationStrategy(ExpirationAndSignatureCheckStrategy())
-                offlineLoader?.let { setOfflineDataLoader(it) }
-                cacheCleaner?.let { setCacheCleaner(it) }
-            }
-
-            try {
-                validationJob.onlineRefresh()
-            } catch (e: Exception) {
-                println("Online refresh failed for ${trustSource.serviceType}, attempting offline load...")
-                try {
-                    validationJob.offlineRefresh()
-                } catch (_: Exception) {
-                    throw RuntimeException("Both online and offline trust loading failed", e)
-                }
+            with(trustSource) {
+                validationJob(lotlUrl, source).refresh(trustSource)
             }
         }
+    }
+
+    private fun TLValidationJob.refresh(trustSource: TrustSource.LoTL) {
+        try {
+            onlineRefresh()
+        } catch (e: Exception) {
+            println("Online refresh failed for ${trustSource.serviceType}, attempting offline load...")
+            try {
+                offlineRefresh()
+            } catch (_: Exception) {
+                throw RuntimeException("Both online and offline trust loading failed", e)
+            }
+        }
+    }
+
+    private fun TrustSource.LoTL.validationJob(
+        lotlUrl: String,
+        source: TrustedListsCertificateSource,
+    ) = TLValidationJob().apply {
+        setListOfTrustedListSources(lotlSource(lotlUrl))
+        setOnlineDataLoader(onlineLoader)
+        setTrustedListCertificateSource(source)
+        setSynchronizationStrategy(ExpirationAndSignatureCheckStrategy())
+        offlineLoader?.let { setOfflineDataLoader(it) }
+        cacheCleaner?.let { setCacheCleaner(it) }
     }
 
     private fun TrustSource.LoTL.lotlSource(lotlUrl: String): LOTLSource =
