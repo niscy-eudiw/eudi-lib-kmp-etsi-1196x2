@@ -27,11 +27,13 @@ import eu.europa.esig.dss.spi.client.http.IgnoreDataLoader
 import eu.europa.esig.dss.spi.tsl.TrustedListsCertificateSource
 import eu.europa.esig.dss.tsl.cache.CacheCleaner
 import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
+import eu.europa.esig.dss.tsl.function.TLPredicateFactory
+import eu.europa.esig.dss.tsl.function.TypeOtherTSLPointer
+import eu.europa.esig.dss.tsl.function.XMLOtherTSLPointer
 import eu.europa.esig.dss.tsl.job.TLValidationJob
 import eu.europa.esig.dss.tsl.source.LOTLSource
 import eu.europa.esig.dss.tsl.sync.ExpirationAndSignatureCheckStrategy
 import kotlinx.coroutines.*
-import java.nio.file.Files
 import java.nio.file.Path
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
@@ -46,7 +48,7 @@ import kotlin.time.toJavaInstant
 public fun buildLoTLTrust(
     clock: Clock = Clock.System,
     scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-    cacheDir: Path? = null,
+    cacheDir: Path,
     revocationEnabled: Boolean = false,
     builder: MutableMap<VerificationContext, Pair<TrustSource.LoTL, String>>.() -> Unit,
 ): DssLoadAndTrust = DssLoadAndTrust(
@@ -65,7 +67,7 @@ public data class DssLoadAndTrust private constructor(
         public operator fun invoke(
             clock: Clock = Clock.System,
             scope: CoroutineScope,
-            cacheDir: Path? = null,
+            cacheDir: Path,
             revocationEnabled: Boolean = false,
             instructions: Map<VerificationContext, Pair<TrustSource.LoTL, String>>,
         ): DssLoadAndTrust {
@@ -167,6 +169,8 @@ public class DSSLoader(
 
     private fun TrustSource.LoTL.lotlSource(lotlUrl: String): LOTLSource =
         LOTLSource().apply {
+            lotlPredicate = TLPredicateFactory.createEULOTLPredicate()
+            tlPredicate = TypeOtherTSLPointer(tlType).and(XMLOtherTSLPointer())
             url = lotlUrl
             trustAnchorValidityPredicate = GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate()
             tlVersions = listOf(5, 6)
@@ -179,12 +183,10 @@ public class DSSLoader(
 
     public companion object {
         public operator fun invoke(
-            cacheDir: Path?,
+            cacheDir: Path,
             lotlLocationPerSource: Map<TrustSource.LoTL, String>,
         ): DSSLoader {
-            val tlCacheDirectory =
-                (cacheDir ?: Files.createTempDirectory("lotl-cache")).toFile()
-
+            val tlCacheDirectory = cacheDir.toFile()
             val offlineLoader: DSSCacheFileLoader = FileCacheDataLoader().apply {
                 setCacheExpirationTime(24 * 60 * 60 * 1000)
                 setFileCacheDirectory(tlCacheDirectory)

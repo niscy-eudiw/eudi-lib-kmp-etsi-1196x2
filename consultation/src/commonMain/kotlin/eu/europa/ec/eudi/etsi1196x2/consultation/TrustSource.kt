@@ -17,6 +17,6 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
 
 public sealed interface TrustSource {
     public data class LoTE(val loteType: String, val serviceType: String) : TrustSource
-    public data class LoTL(val lotlType: String, val serviceType: String) : TrustSource
+    public data class LoTL(val tlType: String, val serviceType: String) : TrustSource
     public data object OutOfBand : TrustSource
 }

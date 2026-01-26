@@ -22,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
+import java.nio.file.Files
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
@@ -32,18 +33,22 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 object EUDIDev {
-    private val pubEEASource = TrustSource.LoTL(
-        "trustedlist.serviceproviders.eudiw.dev/PubEEA",
-        "http://uri.etsi.org/TrstSvc/Svctype/EAA/Pub-EAA",
-    )
-    private val pidProviderSource = TrustSource.LoTL(
-        "trustedlist.serviceproviders.eudiw.dev/PID",
-        "http://uri.etsi.org/Svc/Svctype/Provider/PID",
-    )
+    private val pubEEASource =
+        TrustSource.LoTL(
+            "http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric",
+            "http://uri.etsi.org/TrstSvc/Svctype/EAA/Pub-EAA",
+        )
+    private val pidProviderSource =
+        TrustSource.LoTL(
+            "http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric",
+            "http://uri.etsi.org/Svc/Svctype/Provider/PID",
+        )
     private const val LOTL_URL = "https://trustedlist.serviceproviders.eudiw.dev/LOTL/01.xml"
 
+    private val cacheDir = Files.createTempDirectory("lotl-cache")
+
     val dssLoaderAndTrust =
-        buildLoTLTrust(revocationEnabled = false) {
+        buildLoTLTrust(revocationEnabled = false, cacheDir = cacheDir) {
             put(VerificationContext.PID, pidProviderSource to LOTL_URL)
             put(VerificationContext.PubEAA, pubEEASource to LOTL_URL)
         }
@@ -61,9 +66,8 @@ class IsChainTrustedUsingLoTLTest {
         )
     }
 
-    // TODO Check why this is not passing
     @Test
-    @Ignore("This is not passing")
+    @Ignore("This is not passing because current LoTL contains the same certs for PID and PubEAA service types")
     fun verifyThatPidX5CIsNotTrustedForPubEAAContext() = runTest {
         assertIs<CertificationChainValidation.NotTrusted>(
             isChainTrustedForContext(pidX5c, VerificationContext.PubEAA),
@@ -84,8 +88,8 @@ class IsChainTrustedUsingLoTLTest {
 
         buildList {
             repeat(200) {
-                add(async { isChainTrustedForContext(pidX5c, VerificationContext.PID) })
-                add(async { isChainTrustedForContext(pidX5c, VerificationContext.PubEAA) })
+                add(async { isChainTrustedForContext(pidX5c, VerificationContext.PID).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") } })
+                add(async { isChainTrustedForContext(pidX5c, VerificationContext.PubEAA).also { println("${if (it is CertificationChainValidation.Trusted) "Trusted" else "NotTrusted"} ") } })
             }
         }.awaitAll()
     }
