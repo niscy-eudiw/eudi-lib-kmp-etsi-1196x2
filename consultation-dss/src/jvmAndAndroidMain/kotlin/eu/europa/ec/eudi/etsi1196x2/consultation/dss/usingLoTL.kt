@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 import eu.europa.ec.eudi.etsi1196x2.consultation.*
 import eu.europa.ec.eudi.etsi1196x2.consultation.dss.AsyncCache.Entry
 import eu.europa.esig.dss.spi.tsl.TrustedListsCertificateSource
+import eu.europa.esig.dss.tsl.source.LOTLSource
 import kotlinx.coroutines.*
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
@@ -36,8 +37,8 @@ public fun IsChainTrusted.Companion.usingLoTL(
 
 public fun IsChainTrustedForContext.Companion.usingLoTL(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
-    config: Map<VerificationContext, Pair<TrustSource.LoTL, TrustAnchorCreator<X509Certificate, TrustAnchor>?>>,
-    getTrustedListsCertificateByTrustSource: GetTrustedListsCertificateByTrustSource,
+    config: Map<VerificationContext, Pair<LOTLSource, TrustAnchorCreator<X509Certificate, TrustAnchor>?>>,
+    getTrustedListsCertificateByLOTLSource: GetTrustedListsCertificateByLOTLSource,
 ): IsChainTrustedForContext<List<X509Certificate>, TrustAnchor> {
     val trust = config.mapValues { (_, value) ->
         val (trustSource, trustAnchorCreator) = value
@@ -45,41 +46,41 @@ public fun IsChainTrustedForContext.Companion.usingLoTL(
             validateCertificateChain,
             trustAnchorCreator ?: JvmSecurity.trustAnchorCreator(),
         ) {
-            getTrustedListsCertificateByTrustSource(trustSource)
+            getTrustedListsCertificateByLOTLSource(trustSource)
         }
     }
     return IsChainTrustedForContext(trust)
 }
 
-public fun interface GetTrustedListsCertificateByTrustSource {
-    public suspend operator fun invoke(trustSource: TrustSource.LoTL): TrustedListsCertificateSource
+public fun interface GetTrustedListsCertificateByLOTLSource {
+    public suspend operator fun invoke(trustSource: LOTLSource): TrustedListsCertificateSource
 
     public companion object {
         public fun fromBlocking(
             scope: CoroutineScope,
             expectedTrustSourceNo: Int,
             ttl: Duration = 10.minutes,
-            block: (TrustSource.LoTL) -> TrustedListsCertificateSource,
-        ): GetTrustedListsCertificateByTrustSource =
-            GetTrustedListsCertificateByTrustSourceBlocking(scope, expectedTrustSourceNo, ttl, block)
+            block: (LOTLSource) -> TrustedListsCertificateSource,
+        ): GetTrustedListsCertificateByLOTLSource =
+            GetTrustedListsCertificateByLOTLSourceBlocking(scope, expectedTrustSourceNo, ttl, block)
     }
 }
 
-internal class GetTrustedListsCertificateByTrustSourceBlocking(
+internal class GetTrustedListsCertificateByLOTLSourceBlocking(
     scope: CoroutineScope,
     expectedTrustSourceNo: Int,
     ttl: Duration = 10.minutes,
-    block: (TrustSource.LoTL) -> TrustedListsCertificateSource,
-) : GetTrustedListsCertificateByTrustSource {
+    block: (LOTLSource) -> TrustedListsCertificateSource,
+) : GetTrustedListsCertificateByLOTLSource {
 
     private val cached =
-        AsyncCache<TrustSource.LoTL, TrustedListsCertificateSource>(
+        AsyncCache<LOTLSource, TrustedListsCertificateSource>(
             scope = scope,
             maxCacheSize = expectedTrustSourceNo,
             ttl = ttl,
         ) { trustSource -> withContext(Dispatchers.IO) { block(trustSource) } }
 
-    override suspend fun invoke(trustSource: TrustSource.LoTL): TrustedListsCertificateSource = cached(trustSource)
+    override suspend fun invoke(trustSource: LOTLSource): TrustedListsCertificateSource = cached(trustSource)
 }
 
 internal class AsyncCache<A : Any, B : Any>(

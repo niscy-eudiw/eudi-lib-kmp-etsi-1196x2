@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
 import eu.europa.ec.eudi.etsi1196x2.consultation.CertificationChainValidation
-import eu.europa.ec.eudi.etsi1196x2.consultation.TrustSource
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
 import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
 import eu.europa.esig.dss.tsl.function.TLPredicateFactory
@@ -38,32 +37,20 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
-object EUDIDev {
-    private val pubEEASource =
-        TrustSource.LoTL(
-            "http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric",
-            "http://uri.etsi.org/TrstSvc/Svctype/EAA/Pub-EAA",
-        )
-    private val pidProviderSource =
-        TrustSource.LoTL(
-            "http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric",
-            "http://uri.etsi.org/Svc/Svctype/Provider/PID",
-        )
+object EUDIRefDevEnv {
+
+    //
+    // Conventions applicable to EUDI Echo system
+    //
+    private const val PUB_EAA_SVC_TYPE = "http://uri.etsi.org/TrstSvc/Svctype/EAA/Pub-EAA"
+    private const val PID_SVC_TYPE = "http://uri.etsi.org/Svc/Svctype/Provider/PID"
     private const val LOTL_URL = "https://trustedlist.serviceproviders.eudiw.dev/LOTL/01.xml"
-
-    private val cacheDir = Files.createTempDirectory("lotl-cache")
-
-    val dssLoaderAndTrust =
-        buildLoTLTrust(revocationEnabled = false, cacheDir = cacheDir) {
-            put(VerificationContext.PID, pidProviderSource.lotlSource(LOTL_URL))
-            put(VerificationContext.PubEAA, pubEEASource.lotlSource(LOTL_URL))
-        }
-
-    private fun TrustSource.LoTL.lotlSource(lotlUrl: String): Pair<TrustSource.LoTL, LOTLSource> {
+    private const val TL_TYPE = "http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUgeneric"
+    private fun lotlSource(serviceType: String): LOTLSource {
         val lotlSource = LOTLSource().apply {
             lotlPredicate = TLPredicateFactory.createEULOTLPredicate()
-            tlPredicate = TypeOtherTSLPointer(tlType).and(XMLOtherTSLPointer())
-            url = lotlUrl
+            tlPredicate = TypeOtherTSLPointer(TL_TYPE).and(XMLOtherTSLPointer())
+            url = LOTL_URL
             trustAnchorValidityPredicate = GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate()
             tlVersions = listOf(5, 6)
             trustServicePredicate =
@@ -71,14 +58,22 @@ object EUDIDev {
                     tspServiceType.serviceInformation.serviceTypeIdentifier == serviceType
                 }
         }
-        return this to lotlSource
+        return lotlSource
     }
+
+    private val cacheDir = Files.createTempDirectory("lotl-cache")
+
+    val dssLoaderAndTrust =
+        buildLoTLTrust(revocationEnabled = false, cacheDir = cacheDir) {
+            put(VerificationContext.PID, lotlSource(PID_SVC_TYPE))
+            put(VerificationContext.PubEAA, lotlSource(PUB_EAA_SVC_TYPE))
+        }
 }
 
 class IsChainTrustedUsingLoTLTest {
 
     val isChainTrustedForContext =
-        EUDIDev.dssLoaderAndTrust.isChainTrustedForContext.contraMap(::certsFromX5C)
+        EUDIRefDevEnv.dssLoaderAndTrust.isChainTrustedForContext.contraMap(::certsFromX5C)
 
     @Test
     fun verifyThatPidX5CIsTrustedForPIDContext() = runTest {
@@ -105,7 +100,7 @@ class IsChainTrustedUsingLoTLTest {
     @Test
     fun checkInParallel() = runTest {
         val isChainTrustedForContext =
-            EUDIDev.dssLoaderAndTrust.isChainTrustedForContext.contraMap(::certsFromX5C)
+            EUDIRefDevEnv.dssLoaderAndTrust.isChainTrustedForContext.contraMap(::certsFromX5C)
 
         buildList {
             repeat(200) {
