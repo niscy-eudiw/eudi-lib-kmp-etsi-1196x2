@@ -32,7 +32,6 @@ kotlin {
         apiVersion = KotlinVersion.KOTLIN_2_1
         optIn =
             listOf(
-                "kotlinx.serialization.ExperimentalSerializationApi",
                 "kotlin.io.encoding.ExperimentalEncodingApi",
                 "kotlin.ExperimentalStdlibApi",
                 "kotlin.time.ExperimentalTime",
