@@ -55,6 +55,8 @@ public object JvmSecurity {
         date = Date.from(at.toJavaInstant())
     }
 
+    public val TRUST_ANCHOR_WITH_NO_NAME_CONSTRAINTS: TrustAnchorCreator<X509Certificate, TrustAnchor> = trustAnchorCreator()
+
     public fun trustAnchorCreator(
         nameConstraints: ByteArray? = null,
     ): TrustAnchorCreator<X509Certificate, TrustAnchor> =

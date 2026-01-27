@@ -31,13 +31,18 @@ import java.security.cert.X509Certificate
  * @param getTrustedListsCertificateSource a suspend function that retrieves the trusted lists certificate source containing trust anchors
  * @return an [IsChainTrusted] instance configured to validate certificate chains using the provided trusted list
  *
+ * @see TrustedListsCertificateSource
  * @see GetTrustedListsCertificateByLOTLSource
  */
 public fun IsChainTrusted.Companion.usingLoTL(
     validateCertificateChain: ValidateCertificateChainJvm = ValidateCertificateChainJvm(),
-    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.trustAnchorCreator(),
+    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.TRUST_ANCHOR_WITH_NO_NAME_CONSTRAINTS,
     getTrustedListsCertificateSource: suspend () -> TrustedListsCertificateSource,
 ): IsChainTrusted<List<X509Certificate>, TrustAnchor> =
     IsChainTrusted(validateCertificateChain) {
         getTrustedListsCertificateSource().trustAnchors(trustAnchorCreator)
     }
+
+internal fun TrustedListsCertificateSource.trustAnchors(
+    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor>,
+): List<TrustAnchor> = certificates.map { certToken -> trustAnchorCreator(certToken.certificate) }

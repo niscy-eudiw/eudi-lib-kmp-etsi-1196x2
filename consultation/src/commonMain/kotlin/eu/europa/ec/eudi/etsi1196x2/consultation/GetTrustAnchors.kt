@@ -18,8 +18,21 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-public fun interface GetTrustAnchors<out TRUST_ANCHORS : Any> : suspend () -> List<TRUST_ANCHORS> {
+/**
+ * Functional interface for retrieving a list of trust anchors.
+ *
+ * @param TRUST_ANCHORS the type representing trust anchors.
+ *
+ * @see IsChainTrusted
+ */
+public fun interface GetTrustAnchors<out TRUST_ANCHORS : Any> :
+    suspend () -> List<TRUST_ANCHORS> {
+
     public companion object {
+        /**
+         * Creates an instance of GetTrustAnchors that reads trust anchors from the given source only once.
+         * @param source the source of trust anchors.
+         */
         public fun <TRUST_ANCHOR : Any> once(source: suspend () -> List<TRUST_ANCHOR>): GetTrustAnchors<TRUST_ANCHOR> =
             GetTrustAnchorsOnce(source)
     }

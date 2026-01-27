@@ -23,10 +23,4 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
  */
 public fun interface TrustAnchorCreator<in CERT : Any, out TRUST_ANCHOR : Any> {
     public operator fun invoke(cert: CERT): TRUST_ANCHOR
-
-    public companion object
 }
-
-public inline fun <C1 : Any, TA : Any, C2 : Any> TrustAnchorCreator<C1, TA>.contraMap(
-    crossinline f: (C2) -> C1,
-): TrustAnchorCreator<C2, TA> = TrustAnchorCreator { invoke(f(it)) }

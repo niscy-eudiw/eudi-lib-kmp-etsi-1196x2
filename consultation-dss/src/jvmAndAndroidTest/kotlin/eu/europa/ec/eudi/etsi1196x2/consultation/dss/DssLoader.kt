@@ -19,6 +19,7 @@ import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrusted
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainJvm
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
+import eu.europa.ec.eudi.etsi1196x2.consultation.or
 import eu.europa.esig.dss.service.http.commons.CommonsDataLoader
 import eu.europa.esig.dss.service.http.commons.FileCacheDataLoader
 import eu.europa.esig.dss.spi.client.http.DSSCacheFileLoader
@@ -92,6 +93,7 @@ class DSSLoader(
         clock: Clock = Clock.System,
         ttl: Duration = 10.minutes,
         revocationEnabled: Boolean = false,
+        fallBack: IsChainTrusted<List<X509Certificate>, TrustAnchor>? = null,
     ): IsChainTrustedForContext<List<X509Certificate>, TrustAnchor> {
         val validateCertificateChain =
             ValidateCertificateChainJvm {
@@ -109,8 +111,9 @@ class DSSLoader(
             )
 
         val trust = sourcePerVerification.mapValues { (_, lotlSource) ->
-            val provider = getTrustedListsCertificateByLOTLSource.asGetTrustAnchors(lotlSource)
-            IsChainTrusted(validateCertificateChain, provider)
+            val provider = getTrustedListsCertificateByLOTLSource.asProviderFor(lotlSource)
+            val isChainTrusted = IsChainTrusted(validateCertificateChain, provider)
+            if (fallBack != null) isChainTrusted.or(fallBack) else isChainTrusted
         }
 
         return IsChainTrustedForContext(trust)

@@ -36,6 +36,10 @@ import kotlin.time.Duration
  * The interface provides a method to asynchronously fetch a [TrustedListsCertificateSource]
  * based on the provided [LOTLSource]. It includes a companion object for creating an instance
  * using blocking logic wrapped in a coroutine-friendly structure.
+ *
+ * Note that in DSS:
+ * - [LOTLSource] is a set of predicates to traverse a LOTL, using a [eu.europa.esig.dss.tsl.job.TLValidationJob]
+ * - A [eu.europa.esig.dss.tsl.job.TLValidationJob] job aggregates matching certificates to a [TrustedListsCertificateSource]
  */
 public fun interface GetTrustedListsCertificateByLOTLSource {
 
@@ -46,20 +50,31 @@ public fun interface GetTrustedListsCertificateByLOTLSource {
      */
     public suspend operator fun invoke(trustSource: LOTLSource): TrustedListsCertificateSource
 
+    public fun asProviderFor(
+        trustSource: LOTLSource,
+        trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.TRUST_ANCHOR_WITH_NO_NAME_CONSTRAINTS,
+    ): GetTrustAnchors<TrustAnchor> =
+        GetTrustAnchors {
+            invoke(trustSource).trustAnchors(trustAnchorCreator)
+        }
+
     public companion object {
+        private val DEFAULT_SCOPE = CoroutineScope(Dispatchers.Default + SupervisorJob())
+        private val DEFAULT_DISPATCHER = Dispatchers.IO
+
         /**
          * Creates a [GetTrustedListsCertificateByLOTLSource] instance from blocking logic.
          *
-         * @param coroutineScope the coroutine coroutineScope for executing the blocking logic
-         * @param coroutineDispatcher the coroutine coroutineDispatcher for executing the blocking logic
+         * @param coroutineScope the overall scope of the resulting [GetTrustedListsCertificateByLOTLSource]. By default, adds [SupervisorJob]
+         * @param coroutineDispatcher the coroutine dispatcher for executing the blocking logic
          * @param expectedTrustSourceNo the expected number of trust sources
-         * @param ttl the time-to-live duration for caching the certificate source
+         * @param ttl the time-to-live duration for caching the certificate source. It should be set to a value higher than the average duration of executing the [block]
          * @param block the blocking function to retrieve the certificate source
          * @return the [GetTrustedListsCertificateByLOTLSource] instance
          */
         public fun fromBlocking(
-            coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
-            coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            coroutineScope: CoroutineScope = DEFAULT_SCOPE,
+            coroutineDispatcher: CoroutineDispatcher = DEFAULT_DISPATCHER,
             clock: Clock = Clock.System,
             ttl: Duration,
             expectedTrustSourceNo: Int,
@@ -75,18 +90,6 @@ public fun interface GetTrustedListsCertificateByLOTLSource {
             )
     }
 }
-
-public fun GetTrustedListsCertificateByLOTLSource.asGetTrustAnchors(
-    trustSource: LOTLSource,
-    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor> = JvmSecurity.trustAnchorCreator(),
-): GetTrustAnchors<TrustAnchor> =
-    GetTrustAnchors {
-        invoke(trustSource).trustAnchors(trustAnchorCreator)
-    }
-
-internal fun TrustedListsCertificateSource.trustAnchors(
-    trustAnchorCreator: TrustAnchorCreator<X509Certificate, TrustAnchor>,
-): List<TrustAnchor> = certificates.map { trustAnchorCreator(it.certificate) }
 
 internal class GetTrustedListsCertificateByLOTLSourceBlocking(
     scope: CoroutineScope,
@@ -121,9 +124,11 @@ internal class AsyncCache<A : Any, B : Any>(
     private data class Entry<B>(val deferred: Deferred<B>, val createdAt: Long)
 
     private val mutex = Mutex()
-    private val cache = object : LinkedHashMap<A, Entry<B>>(maxCacheSize, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<A, Entry<B>>) = size > maxCacheSize
-    }
+    private val cache =
+        object : LinkedHashMap<A, Entry<B>>(maxCacheSize, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<A, Entry<B>>) =
+                size > maxCacheSize
+        }
 
     override suspend fun invoke(key: A): B {
         val now = clock.now().toEpochMilliseconds()
