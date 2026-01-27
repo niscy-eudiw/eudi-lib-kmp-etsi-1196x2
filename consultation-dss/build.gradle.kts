@@ -92,12 +92,15 @@ kotlin {
         }
         val jvmAndAndroidMain by getting {
             dependencies {
-                implementation(libs.dss.jades)
                 implementation(libs.dss.validation)
-                implementation(libs.dss.policy.jaxb)
                 implementation(libs.dss.service)
                 implementation(libs.dss.tsl.validation)
                 implementation(libs.dss.utils)
+            }
+        }
+
+        val jvmAndAndroidTest by getting {
+            dependencies {
                 implementation(libs.dss.utils.guava)
             }
         }

@@ -89,9 +89,8 @@ class IsChainTrustedUsingLoTLTest {
 
     @Test
     fun verifyThatPidX5CIsTrustedForPIDContext() = runTest {
-        assertIs<CertificationChainValidation.Trusted<TrustAnchor>>(
-            isX5CTrusted(pidX5c, VerificationContext.PID),
-        )
+        val validation = isX5CTrusted(pidX5c, VerificationContext.PID)
+        assertIs<CertificationChainValidation.Trusted<TrustAnchor>>(validation)
     }
 
     @Test
