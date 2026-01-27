@@ -13,6 +13,7 @@ dependency-check = "12.1.1"
 kover = "0.9.1"
 dokka = "1.9.20"
 dss = "6.4.RC1"
+bouncyCastle = "1.80"
 
 [libraries]
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
@@ -32,6 +33,7 @@ dss-utils = { module = "eu.europa.ec.joinup.sd-dss:dss-utils", version.ref = "ds
 dss-service = { module = "eu.europa.ec.joinup.sd-dss:dss-service", version.ref = "dss" }
 dss-tsl-validation = { module = "eu.europa.ec.joinup.sd-dss:dss-tsl-validation", version.ref = "dss" }
 dss-utils-guava = { module = "eu.europa.ec.joinup.sd-dss:dss-utils-google-guava", version.ref = "dss" }
+bouncy-castle = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncyCastle" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
