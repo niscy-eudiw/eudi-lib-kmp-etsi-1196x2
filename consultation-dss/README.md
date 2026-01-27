@@ -49,4 +49,4 @@ Usage examples can be found in:
 
 ## Platform Support
 
-The library targets JVM and Android targets.
+The library targets JVM and Android.
