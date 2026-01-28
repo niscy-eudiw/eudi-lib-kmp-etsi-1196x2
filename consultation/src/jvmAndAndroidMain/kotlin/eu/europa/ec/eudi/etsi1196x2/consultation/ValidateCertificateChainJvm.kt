@@ -73,6 +73,7 @@ public class ValidateCertificateChainJvm(
     ): CertificationChainValidation<TrustAnchor> =
         withContext(coroutineContext) {
             require(chain.isNotEmpty()) { "Chain must not be empty" }
+            require(trustAnchors.isNotEmpty()) { "Trust anchors must not be empty" }
             try {
                 val pkixParameters = PKIXParameters(trustAnchors).apply(customization)
                 val certPath = certificateFactory.generateCertPath(chain)
@@ -95,6 +96,6 @@ public class ValidateCertificateChainJvm(
         }
 
         private fun Throwable.notTrusted(): CertificationChainValidation.NotTrusted =
-            cause?.notTrusted() ?: CertificationChainValidation.NotTrusted(this)
+            CertificationChainValidation.NotTrusted(this)
     }
 }
