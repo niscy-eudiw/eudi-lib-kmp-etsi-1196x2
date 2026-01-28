@@ -33,23 +33,25 @@ public fun interface GetTrustAnchors<out TRUST_ANCHORS : Any> :
          * Creates an instance of GetTrustAnchors that reads trust anchors from the given source only once.
          * @param source the source of trust anchors.
          */
-        public fun <TRUST_ANCHOR : Any> once(source: suspend () -> List<TRUST_ANCHOR>): GetTrustAnchors<TRUST_ANCHOR> =
-            GetTrustAnchorsOnce(source)
+        public fun <TRUST_ANCHOR : Any> once(source: suspend () -> List<TRUST_ANCHOR>): GetTrustAnchors<TRUST_ANCHOR> {
+            val once = InvokeOnce(source)
+            return GetTrustAnchors { once() }
+        }
     }
 }
 
-private class GetTrustAnchorsOnce<TRUST_ANCHOR : Any>(
-    private val source: suspend () -> List<TRUST_ANCHOR>,
-) : GetTrustAnchors<TRUST_ANCHOR> {
+private class InvokeOnce<T : Any>(
+    private val source: suspend () -> T,
+) : suspend () -> T {
 
-    private val readKeystore = Mutex()
-    private var trustAnchors: List<TRUST_ANCHOR>? = null
+    private val mutex = Mutex()
+    private var cache: T? = null
 
-    private suspend fun readTrustAnchors(): List<TRUST_ANCHOR> = source.invoke()
+    private suspend fun invokeOnce(): T = source.invoke()
 
-    override suspend fun invoke(): List<TRUST_ANCHOR> =
-        trustAnchors ?: readKeystore.withLock {
+    override suspend fun invoke(): T =
+        cache ?: mutex.withLock {
             // check again in case another thread read the keystore before us
-            trustAnchors ?: readTrustAnchors().also { trustAnchors = it }
+            cache ?: invokeOnce().also { cache = it }
         }
 }

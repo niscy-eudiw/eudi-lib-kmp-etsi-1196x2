@@ -15,6 +15,10 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
+/**
+ * Represents contexts for validating a certificate chain that are specific
+ * to EUDI Wallet
+ */
 public sealed interface VerificationContext {
     /**
      * Check the wallet provider's signature for a Wallet Instance Attestation (WIA)
@@ -126,8 +130,12 @@ public sealed interface VerificationContext {
 }
 
 /**
- * Interface for checking the trustworthiness of a certificate chain
+ * A class for checking the trustworthiness of a certificate chain
  * in the context of a specific [verification][VerificationContext]
+ *
+ * Combinators:
+ * - [plus]: combine two instances of IsChainTrustedForContext into a single one
+ * - [contraMap]: change the chain of certificates representation
  *
  * @param trust the supported verification contexts and their corresponding validations
  * @param CHAIN type representing a certificate chain
@@ -153,6 +161,12 @@ public class IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any>(
     /**
      * Combines two IsChainTrustedForContext instances into a single one
      *
+     * ```kotlin
+     * val a : IsChainTrustedForContext<CertificateChain, TrustAnchor> = ...
+     * val b : IsChainTrustedForContext<CertificateChain, TrustAnchor> = ...
+     * val combined = a + b
+     * ```
+     *
      * @param other another IsChainTrustedForContext instance
      * @return new IsChainTrustedForContext instance with combined trust
      */
@@ -163,6 +177,12 @@ public class IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any>(
 
     /**
      * Changes the chain of certificates representation
+     *
+     * ```kotlin
+     * val a : IsChainTrustedForContext<List<Cert>, TrustAnchor> = ...
+     * fun fromDer(der: ByteArray): Cert =
+     * val b : IsChaintTrustedForContext<List<ByteArray>, TrustAnchor> = a.contraMap{ it.map(fromDer) }
+     * ```
      *
      * @param transform transformation function
      * @return new IsChainTrustedForContext accecpting the new chain representation
