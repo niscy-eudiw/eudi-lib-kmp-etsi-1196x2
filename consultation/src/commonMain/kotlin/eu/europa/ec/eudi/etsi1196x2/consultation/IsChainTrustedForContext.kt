@@ -15,139 +15,18 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
-/**
- * Represents contexts for validating a certificate chain that are specific
- * to EUDI Wallet
- */
-public sealed interface VerificationContext {
-    /**
-     * Check the wallet provider's signature for a Wallet Instance Attestation (WIA)
-     *
-     * Can be used by an Authorization Server implementing
-     * Attestation-Based Client Authentication
-     */
-    public data object WalletInstanceAttestation : VerificationContext
-
-    /**
-     * Check the wallet provider's signature for a Wallet Unit Attestation (WUA)
-     *
-     * Can be used by a Credential Issuer, issuing device-bound attestations
-     * that require WUA
-     */
-    public data object WalletUnitAttestation : VerificationContext
-
-    /**
-     * Check the wallet provider's signature for the Token Status List that keeps
-     * the status of a Wallet Unit Attestation (WUA)
-     *
-     * Can be used by a Credential Issuer, issuing device-bound attestations
-     * to keep track of WUA status
-     */
-    public data object WalletUnitAttestationStatus : VerificationContext
-
-    /**
-     * Check PID Provider's signature for a PID
-     *
-     * Can be used by Wallets after issuance and Verifiers during presentation verification
-     */
-    public data object PID : VerificationContext
-
-    /**
-     * Check the signature of a Status Lists or Identifiers List that keeps the status of a PID
-     *
-     * Can be used by Wallets and Verifiers to check the status of a PID
-     */
-    public data object PIDStatus : VerificationContext
-
-    /**
-     * Check the issuer's signature for a Public EAA
-     *
-     * Can be used by Wallets after issuance and Verifiers during presentation verification
-     */
-    public data object PubEAA : VerificationContext
-
-    /**
-     * Check the signature of a Status Lists or Identifiers List that keeps the status of a Public EAA
-     *
-     * Can be used by Wallets and Verifiers to check the status of a PUB_EAA
-     */
-    public data object PubEAAStatus : VerificationContext
-
-    /**
-     * Check the issuer's signature for a Qualified EAA
-     *
-     * Can be used by Wallets after issuance and Verifiers during presentation verification
-     */
-    public data object QEAA : VerificationContext
-
-    /**
-     * Check the signature of a Status Lists or Identifiers List that keeps the status of
-     * a qualified electronic attestation of attributes (QEAA), that supports revocation
-     *
-     * Can be used by Wallets and Verifiers to check the status of a QEAA
-     */
-    public data object QEAAStatus : VerificationContext
-
-    /**
-     * Check the issuer's signature for an electronic attestation of attributes (EAA)
-     *
-     * Can be used by Wallets after issuance and Verifiers during presentation verification
-     *
-     * @param useCase the use case of the EAA
-     */
-    public data class EAA(val useCase: String) : VerificationContext
-
-    /**
-     * Check the signature of a Status Lists or Identifiers List that keeps the status
-     * of an electronic attestation of attributes (EAA), that supports revocation
-     *
-     * Can be used by Wallets and Verifiers to check the status of an EAA
-     *
-     * @param useCase the use case of the EAA
-     */
-    public data class EAAStatus(val useCase: String) : VerificationContext
-
-    /**
-     * Check the signature of a registration certificate of an Issuer or Verifier
-     *
-     * Can be used by Wallets to verify the signature of the registration certificate of an Issuer or Verifier, during
-     * issuance and presentation respectively.
-     */
-    public data object WalletRelyingPartyRegistrationCertificate : VerificationContext
-
-    /**
-     * Check the access certificate of an Issuer or Verifier
-     *
-     * Can be used by Wallets to verify the signature of the registration certificate of an Issuer or Verifier, during
-     * issuance (signed credential issuer metadata) and presentation respectively (signed authorization request).
-     */
-    public data object WalletRelyingPartyAccessCertificate : VerificationContext
-
-    /**
-     * Custom verification context
-     */
-    public data class Custom(val useCase: String) : VerificationContext
-}
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.withContext
 
 /**
- * A class for checking the trustworthiness of a certificate chain
- * in the context of a specific [verification][VerificationContext]
+ * An interface for checking the trustworthiness of a certificate chain
+ * in the context of a specific verification context
  *
- * Combinators:
- * - [plus]: combine two instances of IsChainTrustedForContext into a single one
- * - [recoverWith]: combine two instances of IsChainTrustedForContext into a single one,
- *   where the second one is used as a fallback if the first one fails, conditionally
- * - [or]: combine two instances of IsChainTrustedForContext into a single one,
- *   where the second one is used as a fallback if the first one fails
- * - [contraMap]: change the chain of certificates representation
- *
- * @param trust the supported verification contexts and their corresponding validations
  * @param CHAIN type representing a certificate chain
+ * @param CTX type representing the verification context
  * @param TRUST_ANCHOR type representing a trust anchor
  */
-public class IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any>(
-    private val trust: Map<VerificationContext, IsChainTrusted<CHAIN, TRUST_ANCHOR>>,
-) {
+public fun interface IsChainTrustedForContextF<in CHAIN : Any, in CTX : Any, out TRUST_ANCHOR : Any> {
 
     /**
      * Check certificate chain is trusted in the context of
@@ -159,125 +38,91 @@ public class IsChainTrustedForContext<in CHAIN : Any, out TRUST_ANCHOR : Any>(
      */
     public suspend operator fun invoke(
         chain: CHAIN,
-        verificationContext: VerificationContext,
-    ): CertificationChainValidation<TRUST_ANCHOR>? = trust[verificationContext]?.invoke(chain)
+        verificationContext: CTX,
+    ): CertificationChainValidation<TRUST_ANCHOR>?
+
+    public companion object
+}
+
+/**
+ * A default implementation of [IsChainTrustedForContextF]
+ *
+ *  Note: This class owns the lifecycle of its underlying sources.
+ *  When this instance is closed, all internal sources that implement [AutoCloseable] will also be closed.
+ *
+ * @param validateCertificateChain the certificate chain validation function
+ * @param getTrustAnchorsByContext the supported verification contexts and their corresponding trust anchors sources
+ *
+ * @param CHAIN type representing a certificate chain
+ * @param CTX type representing the verification context
+ * @param TRUST_ANCHOR type representing a trust anchor
+ */
+public class IsChainTrustedForContext<in CHAIN : Any, CTX : Any, out TRUST_ANCHOR : Any>(
+    private val validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
+    private val getTrustAnchorsByContext: GetTrustAnchorsForSupportedQueries<CTX, TRUST_ANCHOR>,
+) : IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR>, AutoCloseable by getTrustAnchorsByContext {
 
     /**
-     * Combines two IsChainTrustedForContext instances into a single one
+     * Check certificate chain is trusted in the context of
+     * specific verification
      *
-     * ```kotlin
-     * val a : IsChainTrustedForContext<CertificateChain, TrustAnchor> = ...
-     * val b : IsChainTrustedForContext<CertificateChain, TrustAnchor> = ...
-     * val combined = a + b
-     * ```
-     *
-     * @param other another IsChainTrustedForContext instance
-     * @return new IsChainTrustedForContext instance with combined trust
+     * @param chain certificate chain to check
+     * @param verificationContext verification context
+     * @return outcome of the check. A null value indicates that the given [verificationContext] has not been configured
+     * @throws IllegalStateException if the given [verificationContext] was configured but underlying source didn't return anchors
      */
-    public operator fun plus(
-        other: IsChainTrustedForContext<@UnsafeVariance CHAIN, @UnsafeVariance TRUST_ANCHOR>,
-    ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
-        IsChainTrustedForContext(trust + other.trust)
+    @Throws(IllegalStateException::class)
+    public override suspend operator fun invoke(
+        chain: CHAIN,
+        verificationContext: CTX,
+    ): CertificationChainValidation<TRUST_ANCHOR>? =
+        withContext(CoroutineName(name = "IsChainTrustedForContext - $verificationContext")) {
+            when (val outcome = getTrustAnchorsByContext(verificationContext)) {
+                is GetTrustAnchorsForSupportedQueries.Outcome.Found<TRUST_ANCHOR> -> validateCertificateChain(chain, outcome.trustAnchors)
+                GetTrustAnchorsForSupportedQueries.Outcome.MisconfiguredSource -> error("Could not get trust anchors for verification context $verificationContext")
+                GetTrustAnchorsForSupportedQueries.Outcome.QueryNotSupported -> null
+            }
+        }
 
     /**
      * Changes the chain of certificates representation
      *
      * ```kotlin
-     * val a : IsChainTrustedForContext<List<Cert>, TrustAnchor> = ...
+     * val a : IsChainTrustedForContext<List<Cert>, VerificationContext, TrustAnchor> = ...
      * fun fromDer(der: ByteArray): Cert =
-     * val b : IsChaintTrustedForContext<List<ByteArray>, TrustAnchor> = a.contraMap{ it.map(fromDer) }
+     * val b : IsChainTrustedForContext<List<ByteArray>, VerificationContext, TrustAnchor> = a.contraMap{ it.map(fromDer) }
      * ```
      *
      * @param transform transformation function
-     * @return new IsChainTrustedForContext accecpting the new chain representation
+     * @return new instance, accepting the new chain representation
      * @param C1 the new representation of the certificate chain
      */
-    public fun <C1 : Any> contraMap(transform: (C1) -> CHAIN): IsChainTrustedForContext<C1, TRUST_ANCHOR> =
+    public fun <C1 : Any> contraMap(transform: (C1) -> CHAIN): IsChainTrustedForContext<C1, CTX, TRUST_ANCHOR> =
         IsChainTrustedForContext(
-            trust.mapValues { (_, isChainTrusted) ->
-                isChainTrusted.contraMap(transform)
-            },
+            validateCertificateChain.contraMap(transform),
+            getTrustAnchorsByContext,
         )
 
     /**
-     * Combines `horizontally` the current instance with another one, by extending the existing validation
-     * per [VerificationContext] with the alternative validations as defined in the passed [IsChainTrustedForContext]
+     * Creates a new [IsChainTrustedForContext]
+     * that applies the specified recovery logic in addition to the current
      *
-     * Please be careful when using this operator. Ideally, prefer using the [recoverWith].
-     * For more details read [IsChainTrusted.or].
+     * Do not use this method unless you know what you are doing.
      *
-     * @param alternative the second instance to be combined with the current one.
-     * @return a new instance that combines the trust validation of the current instance
-     * and the provided `other`.
-     *
-     * @see IsChainTrusted.or
-     */
-    public fun or(
-        alternative: IsChainTrustedForContext<@UnsafeVariance CHAIN, @UnsafeVariance TRUST_ANCHOR>,
-    ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
-        or(alternative.trust::get)
-
-    /**
-     * Extends the existing validation performed per `VerificationContext` with the passed alternative validation.
-     *
-     * Please be careful when using this operator. Ideally, prefer using the [recoverWith].
-     * For more details read [IsChainTrusted.or].
-     *
-     * @param alternative another `IsChainTrusted` instance that will be added as an alternative validation for every `VerificationContext`.
-     * @return a new `IsChainTrustedForContext` instance that its existing validation per `VerificationContext` is extended with an
-     *        alternative validation.
-     *
-     * @see IsChainTrusted.or
-     */
-    public fun or(
-        alternative: IsChainTrusted<@UnsafeVariance CHAIN, @UnsafeVariance TRUST_ANCHOR>,
-    ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
-        or { _ -> alternative }
-
-    /**
-     * Given a function that takes a `VerificationContext` and returns a `IsChainTrusted` instance (optionally),
-     * extends the existing validation performed per `VerificationContext` with alternative validation.
-     *
-     *  Please be careful when using this operator. Ideally, prefer using the [recoverWith].
-     *  For more details read [IsChainTrusted.or].
-     *
-     * @param alternative a function that takes a `VerificationContext` and returns optionally an
-     *        `IsChainTrusted` instance, which will be used as an alternative validator to the existing
-     *        validation for a specific `VerificationContext`.
-     * @return a new `IsChainTrustedForContext` instance that is extended with alternative validations
-     *        per `VerificationContext`.
-     *
-     * @see IsChainTrusted.or
-     */
-    public fun or(
-        alternative: (VerificationContext) -> IsChainTrusted<@UnsafeVariance CHAIN, @UnsafeVariance TRUST_ANCHOR>?,
-    ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
-        recoverWith { ctx -> { alternative(ctx) } }
-
-    /**
-     * Extends the current instance by adding recovery logic for each `VerificationContext`.
-     * Allows defining a recovery function that generates alternative validations based on thrown exceptions during
-     * chain trust verification.
-     *
-     * @param recovery a function that takes a `VerificationContext` and returns another function. This returned function
-     *        maps a `Throwable` to an optional `IsChainTrusted` instance, which provides alternative validation logic
-     *        in the context of an error.
-     * @return a new `IsChainTrustedForContext` instance that applies the specified recovery logic in addition to the current
+     * @param recovery  a recovery function that generates alternative validations based on a
+     *     [CTX] and a [CertificationChainValidation.NotTrusted] result.
+     * @return a new instance that applies the specified recovery logic in addition to the current
      *         validation logic.
      */
+    @SensitiveApi
     public fun recoverWith(
-        recovery: (VerificationContext) -> ((Throwable) -> IsChainTrusted<@UnsafeVariance CHAIN, @UnsafeVariance TRUST_ANCHOR>?)?,
-    ): IsChainTrustedForContext<CHAIN, TRUST_ANCHOR> =
-        IsChainTrustedForContext(
-            trust.mapValues { (context, isChainTrusted) ->
-                val recoveryForContext = recovery(context)
-                if (recoveryForContext == null) {
-                    isChainTrusted
-                } else {
-                    isChainTrusted recoverWith recoveryForContext
-                }
-            },
-        )
+        recovery: (CertificationChainValidation.NotTrusted) -> GetTrustAnchorsForSupportedQueries<CTX, @UnsafeVariance TRUST_ANCHOR>?,
+    ): IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> =
+        UnsafeIsChainTrustedForContext(this) { notTrusted ->
+            recovery(notTrusted)?.let {
+                IsChainTrustedForContext(validateCertificateChain, it)
+            }
+        }
 
     public companion object
 }

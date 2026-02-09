@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.etsi1196x2.consultation.dss
+package eu.europa.ec.eudi.etsi1196x2.consultation
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,12 +37,11 @@ class AsyncCacheTest {
 
     @Test
     fun failureInOneKeyDoesNotCancelScopeAndAffectOtherKeys() = runTest {
-        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
-        val dispatcher = StandardTestDispatcher(testScheduler)
+        val testDispatcher = StandardTestDispatcher(testScheduler)
         val ttl = 1000.milliseconds
         val clock = TestClock(testScheduler)
 
-        val cache = AsyncCache<String, String>(scope, dispatcher, clock, ttl, 10) { key ->
+        val cache = AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
             if (key == "fail") {
                 throw RuntimeException("Planned failure")
             }
@@ -62,12 +63,11 @@ class AsyncCacheTest {
     @Test
     fun failingTaskDoesNotEvictNewerValidEntry() = runTest {
         var supplierCalls = 0
-        val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
-        val dispatcher = StandardTestDispatcher(testScheduler)
+        val testDispatcher = StandardTestDispatcher(testScheduler)
         val ttl = 100.milliseconds
         val clock = TestClock(testScheduler)
 
-        val cache = AsyncCache<String, String>(scope, dispatcher, clock, ttl, 10) { key ->
+        val cache = AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
             supplierCalls++
             if (key == "fail" && supplierCalls == 1) {
                 delay(200) // Longer than TTL

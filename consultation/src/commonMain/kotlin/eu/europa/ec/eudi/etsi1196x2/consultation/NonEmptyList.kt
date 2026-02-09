@@ -15,12 +15,13 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
-/**
- * A way to create a trust anchor from a certificate
- *
- * @param CERT the type representing a certificate, or structure holding a certificate
- * @param TRUST_ANCHOR the type representing a trust anchor
- */
-public fun interface TrustAnchorCreator<in CERT : Any, out TRUST_ANCHOR : Any> {
-    public operator fun invoke(cert: CERT): TRUST_ANCHOR
+@JvmInline
+public value class NonEmptyList<out T>(public val list: List<T>) {
+    init {
+        require(list.isNotEmpty()) { "Non-empty list expected, but was empty" }
+    }
+    public companion object {
+        public fun <T> nelOrNull(list: List<T>): NonEmptyList<T>? =
+            if (list.isEmpty()) null else NonEmptyList(list)
+    }
 }

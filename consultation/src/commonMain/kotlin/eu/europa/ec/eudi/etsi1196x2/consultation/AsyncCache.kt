@@ -13,30 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.etsi1196x2.consultation.dss
+package eu.europa.ec.eudi.etsi1196x2.consultation
 
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.plus
+import eu.europa.ec.eudi.etsi1196x2.consultation.AsyncCache.Entry
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration
 
 internal class AsyncCache<A : Any, B>(
-    coroutineScope: CoroutineScope,
-    private val coroutineDispatcher: CoroutineDispatcher,
+    cacheDispatcher: CoroutineDispatcher,
     private val clock: Clock,
     private val ttl: Duration,
     private val maxCacheSize: Int,
     private val supplier: suspend (A) -> B,
-) : suspend (A) -> B {
+) : suspend (A) -> B, AutoCloseable {
 
-    private val scope = coroutineScope + SupervisorJob(coroutineScope.coroutineContext[Job])
+    private val cacheScope = CoroutineScope(SupervisorJob() + cacheDispatcher)
 
     private data class Entry<B>(val deferred: Deferred<B>, val createdAt: Long)
 
@@ -48,6 +42,9 @@ internal class AsyncCache<A : Any, B>(
         }
 
     override suspend fun invoke(key: A): B {
+        if (!cacheScope.isActive) {
+            throw IllegalStateException("AsyncCache has been closed")
+        }
         val now = clock.now().toEpochMilliseconds()
         val entry = mutex.withLock {
             val existing = cache[key]
@@ -55,7 +52,7 @@ internal class AsyncCache<A : Any, B>(
                 existing
             } else {
                 // Launch new computation
-                val newDeferred = scope.async(coroutineDispatcher) {
+                val newDeferred = cacheScope.async {
                     supplier(key)
                 }
                 Entry(newDeferred, now).also { cache[key] = it }
@@ -74,6 +71,13 @@ internal class AsyncCache<A : Any, B>(
             if (cache[key] === entry) {
                 cache.remove(key)
             }
+        }
+    }
+
+    override fun close() {
+        if (cacheScope.isActive) {
+            cacheScope.cancel()
+            cache.clear()
         }
     }
 }
