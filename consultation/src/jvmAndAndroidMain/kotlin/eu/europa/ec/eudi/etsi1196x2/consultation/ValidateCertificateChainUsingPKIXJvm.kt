@@ -25,11 +25,11 @@ import java.security.InvalidAlgorithmParameterException
 import java.security.Provider
 import java.security.cert.*
 
-@Deprecated("Use ValidateCertificateChainUsingPKIXJvm instead", ReplaceWith("ValidateCertificateChainUsingPKIXJvm"))
+@Deprecated("Use ValidateCertificateChainUsingPKIX instead", replaceWith = ReplaceWith("ValidateCertificateChainUsingPKIX"))
 public typealias ValidateCertificateChainJvm = ValidateCertificateChainUsingPKIXJvm
 
 /**
- * A JVM-specific implementation of [ValidateCertificateChainUsingPKIX]
+ * A JVM-specific implementation of [ValidateCertificateChain]
  *
  * @param dispatcher the coroutine dispatcher to use for validating certificate chains.
  *        Defaults to [ValidateCertificateChainUsingPKIXJvm.DEFAULT_DISPATCHER]

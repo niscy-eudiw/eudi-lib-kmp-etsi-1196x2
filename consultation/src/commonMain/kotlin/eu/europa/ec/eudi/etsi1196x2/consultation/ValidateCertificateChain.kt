@@ -37,6 +37,9 @@ public fun interface ValidateCertificateChain<in CHAIN : Any, TRUST_ANCHOR : Any
     public companion object
 }
 
+public fun interface ValidateCertificateChainUsingPKIX<in CHAIN : Any, TRUST_ANCHOR : Any> :
+    ValidateCertificateChain<CHAIN, TRUST_ANCHOR>
+
 /**
  * Represents the outcome of the validation
  *
@@ -76,9 +79,6 @@ public class ValidateCertificateChainUsingDirectTrust<in CHAIN : Any, TRUST_ANCH
         }
     }
 }
-
-public fun interface ValidateCertificateChainUsingPKIX<in CHAIN : Any, TRUST_ANCHOR : Any> :
-    ValidateCertificateChain<CHAIN, TRUST_ANCHOR>
 
 /**
  * Changes the representation of the certificate chain

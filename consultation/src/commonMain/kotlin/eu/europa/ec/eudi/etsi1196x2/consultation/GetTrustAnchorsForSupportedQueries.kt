@@ -32,6 +32,7 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
  * @param QUERY the type of the query
  * @param TRUST_ANCHOR the type of the trust anchors returned by the source
  */
+@Deprecated("To be removed")
 public class GetTrustAnchorsForSupportedQueries<QUERY : Any, out TRUST_ANCHOR : Any> internal constructor(
     private val sources: Map<Set<QUERY>, GetTrustAnchors<QUERY, TRUST_ANCHOR>>,
 ) {

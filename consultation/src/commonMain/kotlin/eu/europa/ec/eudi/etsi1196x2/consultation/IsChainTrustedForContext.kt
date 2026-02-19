@@ -15,110 +15,131 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.withContext
+public typealias SourceAndValidate<C, CTX, TA> =
+    Pair<GetTrustAnchors<CTX, TA>, ValidateCertificateChain<C, TA>>
 
-/**
- * An interface for checking the trustworthiness of a certificate chain
- * in the context of a specific verification context
- *
- * @param CHAIN type representing a certificate chain
- * @param CTX type representing the verification context
- * @param TRUST_ANCHOR type representing a trust anchor
- */
-public fun interface IsChainTrustedForContextF<in CHAIN : Any, in CTX : Any, out TRUST_ANCHOR : Any> {
+private typealias Sources<CHAIN, CTX, TRUST_ANCHOR> = Map<Set<CTX>, SourceAndValidate<CHAIN, CTX, TRUST_ANCHOR>>
 
-    /**
-     * Check certificate chain is trusted in the context of
-     * specific verification
-     *
-     * @param chain certificate chain to check
-     * @param verificationContext verification context
-     * @return outcome of the check. A null value indicates that the given [verificationContext] has not been configured
-     */
-    public suspend operator fun invoke(
-        chain: CHAIN,
-        verificationContext: CTX,
-    ): CertificationChainValidation<TRUST_ANCHOR>?
+public class IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>
+internal constructor(private val sources: Sources<CHAIN, CTX, TRUST_ANCHOR>) :
+    IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR>
+    where CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any {
 
-    public companion object
-}
+    public constructor() : this(sources = emptyMap())
 
-/**
- * A default implementation of [IsChainTrustedForContextF]
- *
- * @param validateCertificateChain the certificate chain validation function
- * @param getTrustAnchorsByContext the supported verification contexts and their corresponding trust anchors sources
- *
- * @param CHAIN type representing a certificate chain
- * @param CTX type representing the verification context
- * @param TRUST_ANCHOR type representing a trust anchor
- */
-public class IsChainTrustedForContext<in CHAIN : Any, CTX : Any, out TRUST_ANCHOR : Any>(
-    private val validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
-    private val getTrustAnchorsByContext: GetTrustAnchorsForSupportedQueries<CTX, TRUST_ANCHOR>,
-) : IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> {
+    internal constructor(
+        supportedQueries: Set<CTX>,
+        sourceAndValidate: SourceAndValidate<CHAIN, CTX, TRUST_ANCHOR>,
+    ) : this(sources = mapOf(supportedQueries to sourceAndValidate))
 
-    /**
-     * Check certificate chain is trusted in the context of
-     * specific verification
-     *
-     * @param chain certificate chain to check
-     * @param verificationContext verification context
-     * @return outcome of the check. A null value indicates that the given [verificationContext] has not been configured,
-     * or its underlying source didn't return trust anchors
-     */
-    public override suspend operator fun invoke(
+    public constructor(
+        supportedQueries: Set<CTX>,
+        getTrustAnchors: GetTrustAnchors<CTX, TRUST_ANCHOR>,
+        validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
+    ) : this(supportedQueries = supportedQueries, sourceAndValidate = (getTrustAnchors to validateCertificateChain))
+
+    override suspend fun invoke(
         chain: CHAIN,
         verificationContext: CTX,
     ): CertificationChainValidation<TRUST_ANCHOR>? =
-        withContext(CoroutineName(name = "IsChainTrustedForContext - $verificationContext")) {
-            when (val outcome = getTrustAnchorsByContext(verificationContext)) {
-                is GetTrustAnchorsForSupportedQueries.Outcome.Found<TRUST_ANCHOR> -> validateCertificateChain(chain, outcome.trustAnchors)
-                GetTrustAnchorsForSupportedQueries.Outcome.NotFound -> null
-                GetTrustAnchorsForSupportedQueries.Outcome.QueryNotSupported -> null
+        findSource(verificationContext)?.let { (trustOf, validate) ->
+            trustOf(verificationContext)?.let { trustAnchors ->
+                validate(chain, trustAnchors)
             }
         }
 
+    public val supportedContexts: Set<CTX> by lazy { sources.keys.flatten().toSet() }
+
+    public val getTrustAnchors: GetTrustAnchors<CTX, TRUST_ANCHOR> =
+        GetTrustAnchors { verificationContext ->
+            findSource(verificationContext)?.let { (trustOf, _) ->
+                val trustAnchors = trustOf(verificationContext)
+                trustAnchors
+            }
+        }
+
+    private fun findSource(ctx: CTX): SourceAndValidate<CHAIN, CTX, TRUST_ANCHOR>? =
+        sources.entries
+            .find { (ctxs, _) -> ctx in ctxs }
+            ?.value
+
     /**
-     * Changes the chain of certificates representation
+     * Combines this source with an additional query set and [GetTrustAnchors].
      *
-     * ```kotlin
-     * val a : IsChainTrustedForContext<List<Cert>, VerificationContext, TrustAnchor> = ...
-     * fun fromDer(der: ByteArray): Cert =
-     * val b : IsChainTrustedForContext<List<ByteArray>, VerificationContext, TrustAnchor> = a.contraMap{ it.map(fromDer) }
-     * ```
-     *
-     * @param transform transformation function
-     * @return new instance, accepting the new chain representation
-     * @param C1 the new representation of the certificate chain
+     * @param other a pair consisting of a set of supported queries and the corresponding [GetTrustAnchors]
+     * @return a combined source
+     * @throws IllegalArgumentException if the new queries overlap with existing ones
      */
-    public fun <C1 : Any> contraMap(transform: (C1) -> CHAIN): IsChainTrustedForContext<C1, CTX, TRUST_ANCHOR> =
-        IsChainTrustedForContext(
-            validateCertificateChain.contraMap(transform),
-            getTrustAnchorsByContext,
+    @Throws(IllegalArgumentException::class)
+    public infix fun plus(
+        other: Pair<Set<CTX>, SourceAndValidate<@UnsafeVariance CHAIN, @UnsafeVariance CTX, @UnsafeVariance TRUST_ANCHOR>>,
+    ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> {
+        val (queries, sv) = other
+        return this + IsChainTrustedForContext(queries, sv)
+    }
+
+    /**
+     * Combines two sources into one.
+     *
+     * This operation merges the routing tables of both sources. It requires that the sets of
+     * supported queries in both sources are completely disjoint to ensure unambiguous routing.
+     *
+     * @param other the other source to combine with
+     * @return a combined source
+     * @throws IllegalArgumentException if there are overlapping queries between the two sources
+     */
+    @Throws(IllegalArgumentException::class)
+    public infix operator fun plus(
+        other: IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>,
+    ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> {
+        val common = this.supportedContexts.intersect(other.supportedContexts)
+        require(common.isEmpty()) { "Sources have overlapping queries: $common" }
+        return IsChainTrustedForContext(this.sources + other.sources)
+    }
+
+//    /**
+//     * Creates a new [IsChainTrustedForContext]
+//     * that applies the specified recovery logic in addition to the current
+//     *
+//     * Do not use this method unless you know what you are doing.
+//     *
+//     * @param recovery  a recovery function that generates alternative validations based on a
+//     *     [CTX] and a [CertificationChainValidation.NotTrusted] result.
+//     * @return a new instance that applies the specified recovery logic in addition to the current
+//     *         validation logic.
+//     */
+//    @SensitiveApi
+//    public fun recoverWith(
+//        recovery: (CertificationChainValidation.NotTrusted) -> GetTrustAnchorsForSupportedQueries<CTX, @UnsafeVariance TRUST_ANCHOR>?,
+//    ): IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> =
+//        UnsafeIsChainTrustedForContext(this) { notTrusted ->
+//            recovery(notTrusted)?.let {
+//                IsChainTrustedForContext(validateCertificateChain, it)
+//            }
+//        }
+
+    public fun <C2 : Any> contraMap(transformation: (C2) -> CHAIN): IsChainTrustedForContext<C2, CTX, TRUST_ANCHOR> {
+        return IsChainTrustedForContext(
+            sources.mapValues { (_, sourceAndValidator) ->
+                val (source, validator) = sourceAndValidator
+                source to validator.contraMap(transformation)
+            },
         )
+    }
 
-    /**
-     * Creates a new [IsChainTrustedForContext]
-     * that applies the specified recovery logic in addition to the current
-     *
-     * Do not use this method unless you know what you are doing.
-     *
-     * @param recovery  a recovery function that generates alternative validations based on a
-     *     [CTX] and a [CertificationChainValidation.NotTrusted] result.
-     * @return a new instance that applies the specified recovery logic in addition to the current
-     *         validation logic.
-     */
-    @SensitiveApi
-    public fun recoverWith(
-        recovery: (CertificationChainValidation.NotTrusted) -> GetTrustAnchorsForSupportedQueries<CTX, @UnsafeVariance TRUST_ANCHOR>?,
-    ): IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> =
-        UnsafeIsChainTrustedForContext(this) { notTrusted ->
-            recovery(notTrusted)?.let {
-                IsChainTrustedForContext(validateCertificateChain, it)
-            }
+    public companion object {
+
+        public fun <CHAIN : Any, CTX1 : Any, TA : Any, CTX2 : Any> transform(
+            getTrustAnchors: GetTrustAnchors<CTX1, TA>,
+            validateCertificateChain: ValidateCertificateChain<CHAIN, TA>,
+            transformation: Map<CTX2, CTX1>,
+        ): IsChainTrustedForContext<CHAIN, CTX2, TA> {
+            val updatedGetTrustAnchors =
+                getTrustAnchors.contraMap<CTX1, TA, CTX2> { checkNotNull(transformation[it]) }
+            return IsChainTrustedForContext(
+                supportedQueries = transformation.keys,
+                sourceAndValidate = updatedGetTrustAnchors to validateCertificateChain,
+            )
         }
-
-    public companion object
+    }
 }

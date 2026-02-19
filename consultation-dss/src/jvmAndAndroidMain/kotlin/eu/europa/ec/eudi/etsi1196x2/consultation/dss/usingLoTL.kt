@@ -15,20 +15,21 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
-import eu.europa.ec.eudi.etsi1196x2.consultation.GetTrustAnchorsForSupportedQueries
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChain
 import eu.europa.ec.eudi.etsi1196x2.consultation.cached
-import eu.europa.ec.eudi.etsi1196x2.consultation.transform
+import eu.europa.ec.eudi.etsi1196x2.consultation.validator
 import eu.europa.esig.dss.service.http.commons.FileCacheDataLoader
 import eu.europa.esig.dss.tsl.source.LOTLSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.security.cert.TrustAnchor
+import java.security.cert.X509Certificate
 import kotlin.time.Clock
 import kotlin.time.Duration
 
 /**
- * Creates an instance of [GetTrustAnchorsForSupportedQueries] using a trusted list of trust anchors (LoTL) and a file cache loader.
+ * Creates an instance of [IsChainTrustedForContext] using a trusted list of trust anchors (LoTL) and a file cache loader.
  * The implementation has the following characteristics:
  * - Utilizes a file cache loader to load trusted lists from the file system
  * - Depending on the file cache loader configuration, the file downloader may use an online fetcher to
@@ -44,7 +45,7 @@ import kotlin.time.Duration
  *
  * ```kotlin
  *
- *   GetTrustAnchorsForSupportedQueries.usingLoTL(
+ *   IsChainTrustedForContext.usingLoTL(
  *     dssOptions = DssOptions.usingFileCacheDataLoader(
  *         fileCacheExpiration = 24.hours,
  *         cacheDirectory = createTempDirectory("lotl-cache"),
@@ -69,13 +70,19 @@ import kotlin.time.Duration
  * @param ttl the time-to-live duration for caching the certificate source.
  *
  */
-public fun <CTX : Any> GetTrustAnchorsForSupportedQueries.Companion.usingLoTL(
+public fun <CTX : Any> IsChainTrustedForContext.Companion.usingLoTL(
     cacheDispatcher: CoroutineDispatcher = Dispatchers.Default,
     clock: Clock = Clock.System,
     ttl: Duration,
     dssOptions: DssOptions = DssOptions.Default,
     queryPerVerificationContext: Map<CTX, LOTLSource>,
-): GetTrustAnchorsForSupportedQueries<CTX, TrustAnchor> =
+    validateCertificateChain: ValidateCertificateChain<List<X509Certificate>, TrustAnchor>,
+): IsChainTrustedForContext<List<X509Certificate>, CTX, TrustAnchor> =
     GetTrustAnchorsFromLoTL(dssOptions)
-        .cached(cacheDispatcher, clock, ttl, expectedQueries = queryPerVerificationContext.size)
-        .transform(queryPerVerificationContext)
+        .cached(
+            cacheDispatcher,
+            clock,
+            ttl,
+            expectedQueries = queryPerVerificationContext.size,
+        )
+        .validator(queryPerVerificationContext, validateCertificateChain)

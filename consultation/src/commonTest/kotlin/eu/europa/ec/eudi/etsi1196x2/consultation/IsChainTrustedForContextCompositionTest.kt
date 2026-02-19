@@ -18,45 +18,52 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
-class GetTrustAnchorsForSupportedQueriesTest {
+class IsChainTrustedForContextCompositionTest {
 
     private fun mockSource(value: String): GetTrustAnchors<String, String> = GetTrustAnchors { _ ->
         NonEmptyList(listOf(value))
     }
 
+    private fun <C : Any, T : Any> mockChainValidator() = ValidateCertificateChain<C, T> { _, _ -> error("not used") }
+
     @Test
     fun testBasicInvoke() = runTest {
         val queries = setOf("q1", "q2")
         val source = mockSource("v1")
-        val supportedQueries = GetTrustAnchorsForSupportedQueries(queries, source)
+        val validator =
+            source.validator(queries, mockChainValidator())
 
-        val result1 = supportedQueries("q1")
-        assertIs<GetTrustAnchorsForSupportedQueries.Outcome.Found<String>>(result1)
-        assertEquals("v1", result1.trustAnchors.list.first())
+        val result1 = validator.getTrustAnchors("q1")
+        assertNotNull(result1)
+        assertEquals(listOf("v1"), result1.list)
 
-        val result3 = supportedQueries("q3")
-        assertEquals(GetTrustAnchorsForSupportedQueries.Outcome.QueryNotSupported, result3)
+        val result3 = validator.getTrustAnchors("q3")
+        assertNull(result3)
     }
 
     @Test
     fun testPlus() = runTest {
-        val s1 = GetTrustAnchorsForSupportedQueries(setOf("q1"), mockSource("v1"))
-        val s2 = GetTrustAnchorsForSupportedQueries(setOf("q2"), mockSource("v2"))
+        val s1 =
+            mockSource("v1").validator(setOf("q1"), mockChainValidator())
+        val s2 =
+            mockSource("v2").validator(setOf("q2"), mockChainValidator())
         val combined = s1 plus s2
 
-        val r1 = combined("q1")
-        assertIs<GetTrustAnchorsForSupportedQueries.Outcome.Found<String>>(r1)
-        assertEquals("v1", r1.trustAnchors.list.first())
+        val r1 = combined.getTrustAnchors("q1")
+        assertNotNull(r1)
+        assertEquals(listOf("v1"), r1.list)
 
-        val r2 = combined("q2")
-        assertIs<GetTrustAnchorsForSupportedQueries.Outcome.Found<String>>(r2)
-        assertEquals("v2", r2.trustAnchors.list.first())
+        val r2 = combined.getTrustAnchors("q2")
+        assertNotNull(r2)
+        assertEquals(listOf("v2"), r2.list)
     }
 
     @Test
     fun testPlusOverlapInvariant() {
-        val s1 = GetTrustAnchorsForSupportedQueries(setOf("q1"), mockSource("v1"))
-        val s2 = GetTrustAnchorsForSupportedQueries(setOf("q1"), mockSource("v2"))
+        val s1 =
+            mockSource("v1").validator(setOf("q1"), mockChainValidator())
+        val s2 =
+            mockSource("v2").validator(setOf("q1"), mockChainValidator())
 
         assertFailsWith<IllegalArgumentException> {
             s1 plus s2
@@ -67,9 +74,10 @@ class GetTrustAnchorsForSupportedQueriesTest {
     fun testNotFound() = runTest {
         // A source that claims to support a query but returns null
         val source = GetTrustAnchors<String, String> { _ -> null }
-        val supportedQueries = GetTrustAnchorsForSupportedQueries(setOf("q1"), source)
+        val validator =
+            source.validator(setOf("q1"), mockChainValidator())
 
-        val result = supportedQueries("q1")
-        assertEquals(GetTrustAnchorsForSupportedQueries.Outcome.NotFound, result)
+        val result = validator.getTrustAnchors("q1")
+        assertNull(result)
     }
 }

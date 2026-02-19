@@ -16,25 +16,28 @@
 package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.PKIObject
-import eu.europa.ec.eudi.etsi119602.URI
-import eu.europa.ec.eudi.etsi1196x2.consultation.GetTrustAnchorsForSupportedQueries
+import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingDirectTrust
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIX
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
-import eu.europa.ec.eudi.etsi1196x2.consultation.transform
+import eu.europa.ec.eudi.etsi1196x2.consultation.validator
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 
-public class ProvisionTrustAnchorsFromLoTEs<CTX : Any, TRUST_ANCHOR : Any>(
+public class ProvisionTrustAnchorsFromLoTEs<CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any>(
     private val loadLoTEAndPointers: LoadLoTEAndPointers,
-    private val svcTypePerCtx: SupportedLists<Map<CTX, URI>>,
+    private val svcTypePerCtx: SupportedLists<LotEMata<CTX>>,
     private val continueOnProblem: ContinueOnProblem = ContinueOnProblem.Never,
+    private val directTrust: ValidateCertificateChainUsingDirectTrust<CHAIN, TRUST_ANCHOR, *>,
+    private val pkix: ValidateCertificateChainUsingPKIX<CHAIN, TRUST_ANCHOR>,
     private val createTrustAnchor: (PKIObject) -> TRUST_ANCHOR,
 ) {
 
     public suspend operator fun invoke(
         loteLocationsSupported: SupportedLists<String>,
         parallelism: Int = 1,
-    ): GetTrustAnchorsForSupportedQueries<CTX, TRUST_ANCHOR> =
+    ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> =
         coroutineScope {
             loteLocationsSupported.cfgs().asFlow()
                 .map { cfg -> loadLoTEAndCreateTrustAnchorsProvider(cfg) }
@@ -45,10 +48,13 @@ public class ProvisionTrustAnchorsFromLoTEs<CTX : Any, TRUST_ANCHOR : Any>(
 
     private suspend fun loadLoTEAndCreateTrustAnchorsProvider(
         cfg: LoTECfg<CTX>,
-    ): GetTrustAnchorsForSupportedQueries<CTX, TRUST_ANCHOR>? {
+    ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>? {
         val loaded = loadLoTE(cfg) ?: return null
         val getTrustAnchors = GetTrustAnchorsFromLoTE(loaded, createTrustAnchor)
-        return getTrustAnchors.transform(cfg.svcTypePerCtx)
+        val validateCertificateChain =
+            if (cfg.metadata.directTrust) directTrust else pkix
+        val transformation = cfg.metadata.svcTypePerCtx
+        return getTrustAnchors.validator(transformation, validateCertificateChain)
     }
 
     private suspend fun loadLoTE(cfg: LoTECfg<CTX>): LoadedLoTE? {
@@ -67,20 +73,24 @@ public class ProvisionTrustAnchorsFromLoTEs<CTX : Any, TRUST_ANCHOR : Any>(
 
     private data class LoTECfg<CTX : Any>(
         val downloadUrl: String,
-        val svcTypePerCtx: Map<CTX, URI>,
+        val metadata: LotEMata<CTX>,
     )
 
     public companion object {
-        public fun <TRUST_ANCHOR : Any> eudiw(
+        public fun <CHAIN : Any, TRUST_ANCHOR : Any> eudiw(
             loadLoTEAndPointers: LoadLoTEAndPointers,
-            svcTypePerCtx: SupportedLists<Map<VerificationContext, URI>> = SupportedLists.EU,
+            svcTypePerCtx: SupportedLists<LotEMata<VerificationContext>> = SupportedLists.EU,
             continueOnProblem: ContinueOnProblem = ContinueOnProblem.Never,
+            directTrust: ValidateCertificateChainUsingDirectTrust<CHAIN, TRUST_ANCHOR, *>,
+            pkix: ValidateCertificateChainUsingPKIX<CHAIN, TRUST_ANCHOR>,
             createTrustAnchor: (PKIObject) -> TRUST_ANCHOR,
-        ): ProvisionTrustAnchorsFromLoTEs<VerificationContext, TRUST_ANCHOR> =
+        ): ProvisionTrustAnchorsFromLoTEs<CHAIN, VerificationContext, TRUST_ANCHOR> =
             ProvisionTrustAnchorsFromLoTEs(
                 loadLoTEAndPointers,
                 svcTypePerCtx,
                 continueOnProblem,
+                directTrust,
+                pkix,
                 createTrustAnchor,
             )
     }

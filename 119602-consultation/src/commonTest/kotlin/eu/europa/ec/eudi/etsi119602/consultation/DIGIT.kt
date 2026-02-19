@@ -17,14 +17,11 @@ package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.PKIObject
 import eu.europa.ec.eudi.etsi119602.consultation.eu.EUMDLProvidersListSpec
-import eu.europa.ec.eudi.etsi1196x2.consultation.GetTrustAnchorsForSupportedQueries
-import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
-import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
+import eu.europa.ec.eudi.etsi1196x2.consultation.*
 import io.ktor.client.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.fail
 
 object DIGIT {
 
@@ -42,9 +39,12 @@ object DIGIT {
 
     val SVC_TYPE_PER_CTX = SupportedLists.EU.copy(
         eaaProviders = mapOf(
-            "mdl" to mapOf(
-                VerificationContext.EAA("mdl") to EUMDLProvidersListSpec.SVC_TYPE_ISSUANCE,
-                VerificationContext.EAAStatus("mdl") to EUMDLProvidersListSpec.SVC_TYPE_REVOCATION,
+            "mdl" to LotEMata(
+                svcTypePerCtx = mapOf(
+                    VerificationContext.EAA("mdl") to EUMDLProvidersListSpec.SVC_TYPE_ISSUANCE,
+                    VerificationContext.EAAStatus("mdl") to EUMDLProvidersListSpec.SVC_TYPE_REVOCATION,
+                ),
+                directTrust = true,
             ),
         ),
     )
@@ -69,20 +69,19 @@ class DIGITTest {
                 VerificationContext.EAAStatus("mdl"),
             )
 
-        val actualContexts = trustAnchorsFromLoTE.supportedQueries
+        val actualContexts = trustAnchorsFromLoTE.supportedContexts
         assertContentEquals(expectedContexts, actualContexts)
         actualContexts.forEach { ctx ->
-            when (val outcome = trustAnchorsFromLoTE.invoke(ctx)) {
-                is GetTrustAnchorsForSupportedQueries.Outcome.Found<*> -> println("$ctx : ${outcome.trustAnchors.list.size} ")
-                GetTrustAnchorsForSupportedQueries.Outcome.NotFound -> println("$ctx : Not found ")
-                GetTrustAnchorsForSupportedQueries.Outcome.QueryNotSupported -> fail("Context not supported: $ctx")
+            when (val outcome = trustAnchorsFromLoTE.getTrustAnchors(ctx)) {
+                null -> println("$ctx : Not found")
+                else -> println("$ctx : ${outcome.list.size} ")
             }
         }
     }
 
     private suspend fun HttpClient.get(
         loteLocationsSupported: SupportedLists<String>,
-    ): GetTrustAnchorsForSupportedQueries<VerificationContext, PKIObject> {
+    ): IsChainTrustedForContext<*, VerificationContext, PKIObject> {
         val fromHttp =
             ProvisionTrustAnchorsFromLoTEs.eudiw(
                 LoadLoTEAndPointers(
@@ -96,6 +95,11 @@ class DIGITTest {
                 ),
                 svcTypePerCtx = DIGIT.SVC_TYPE_PER_CTX,
                 createTrustAnchor = { it },
+                directTrust = ValidateCertificateChainUsingDirectTrust(
+                    { _ -> error("Not used") },
+                    { _ -> error("Not used") },
+                ),
+                pkix = ValidateCertificateChainUsingPKIX { _, _ -> error("Not used") },
             )
 
         return fromHttp(loteLocationsSupported, parallelism = 10)

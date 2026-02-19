@@ -86,7 +86,7 @@ object Sample {
     }
 }
 
-class ValidateCertificateChainJvmUsingPKIXTest {
+class ValidateCertificateChainUsingPKIXJvmTest {
     private val certs = Sample.create()
     private val intermediate get() = certs.intermediate
     private val eeCertificate get() = certs.end
@@ -98,7 +98,7 @@ class ValidateCertificateChainJvmUsingPKIXTest {
         // trust contains the trust anchor cert
         val chain = listOf(eeCertificate, intermediate)
         val trust = listOf(root)
-        val trustAnchor = assertTrustedUsingPKIX(chain, trust)
+        val trustAnchor = assertTrusted(chain, trust)
         assertEquals(root, trustAnchor.trustedCert)
     }
 
@@ -108,7 +108,7 @@ class ValidateCertificateChainJvmUsingPKIXTest {
         // trust contains the trust anchor cert
         val chain = listOf(eeCertificate, intermediate, root)
         val trust = listOf(root)
-        val trustAnchor = assertTrustedUsingPKIX(chain, trust)
+        val trustAnchor = assertTrusted(chain, trust)
         assertEquals(root, trustAnchor.trustedCert)
     }
 
@@ -118,7 +118,7 @@ class ValidateCertificateChainJvmUsingPKIXTest {
         // trust contains the CA and Trust Anchor certs
         val chain = listOf(eeCertificate)
         val trust = listOf(intermediate, root)
-        val trustAnchor = assertTrustedUsingPKIX(chain, trust)
+        val trustAnchor = assertTrusted(chain, trust)
         // If the validator finds a trust anchor in the trust set that issued the end-entity, it may stop there.
         // In this case, the intermediate cert is in the trust set and it issued the eeCertificate.
         assertEquals(intermediate, trustAnchor.trustedCert)
@@ -128,7 +128,7 @@ class ValidateCertificateChainJvmUsingPKIXTest {
     fun `cert order in chain should affect validation using default Provider`() = runTest {
         val chain = listOf(intermediate, eeCertificate)
         val trust = listOf(root)
-        val validation = validateUsingPKIX(chain, trust, provider = null)
+        val validation = validate(chain, trust, provider = null)
         assertIs<CertificationChainValidation.NotTrusted>(validation)
     }
 
@@ -136,7 +136,7 @@ class ValidateCertificateChainJvmUsingPKIXTest {
     fun `cert order in chain should affect validation using Bouncy Castle Provider`() = runTest {
         val chain = listOf(intermediate, eeCertificate)
         val trust = listOf(root)
-        val trustAnchor = assertTrustedUsingPKIX(chain, trust, BouncyCastleProvider())
+        val trustAnchor = assertTrusted(chain, trust, BouncyCastleProvider())
         assertEquals(root, trustAnchor.trustedCert)
     }
 
@@ -144,7 +144,7 @@ class ValidateCertificateChainJvmUsingPKIXTest {
     fun `validate a partial chain should fail`() = runTest {
         val chain = listOf(eeCertificate)
         val trust = listOf(root)
-        val validation = validateUsingPKIX(chain, trust)
+        val validation = validate(chain, trust)
         assertIs<CertificationChainValidation.NotTrusted>(validation)
         assertIs<CertPathValidatorException>(validation.cause)
     }
@@ -153,22 +153,22 @@ class ValidateCertificateChainJvmUsingPKIXTest {
     fun `when directly trusting the intermediate should succeed `() = runTest {
         val chain = listOf(eeCertificate)
         val trust = listOf(intermediate)
-        val trustAnchor = assertTrustedUsingPKIX(chain, trust)
+        val trustAnchor = assertTrusted(chain, trust)
         assertEquals(intermediate, trustAnchor.trustedCert)
     }
 }
 
-private suspend fun assertTrustedUsingPKIX(
+private suspend fun assertTrusted(
     chain: List<X509Certificate>,
     trust: List<X509Certificate>,
     provider: Provider? = null,
 ): TrustAnchor {
-    val validation = validateUsingPKIX(chain, trust, provider)
+    val validation = validate(chain, trust, provider)
     assertIs<CertificationChainValidation.Trusted<TrustAnchor>>(validation)
     return validation.trustAnchor
 }
 
-private suspend fun validateUsingPKIX(
+private suspend fun validate(
     chain: List<X509Certificate>,
     trust: List<X509Certificate>,
     provider: Provider? = BouncyCastleProvider(),

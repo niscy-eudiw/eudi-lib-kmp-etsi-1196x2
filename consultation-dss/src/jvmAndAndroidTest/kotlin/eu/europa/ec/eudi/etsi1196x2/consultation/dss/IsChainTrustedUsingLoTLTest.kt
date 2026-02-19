@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
 import eu.europa.ec.eudi.etsi1196x2.consultation.*
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIXJvm
 import eu.europa.ec.eudi.etsi1196x2.consultation.dss.EUDIRefDevEnv.httpLoader
 import eu.europa.esig.dss.spi.client.http.NativeHTTPDataLoader
 import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
@@ -60,11 +61,8 @@ object EUDIRefDevEnv {
 
     val httpLoader = ObservableHttpLoader(NativeHTTPDataLoader())
 
-    fun isChainTrustedForContext(): IsChainTrustedForEUDIW<List<X509Certificate>, TrustAnchor> = IsChainTrustedForEUDIW(
-        validateCertificateChain = ValidateCertificateChainUsingPKIXJvm(
-            customization = { isRevocationEnabled = false },
-        ),
-        getTrustAnchorsByContext = GetTrustAnchorsForSupportedQueries.usingLoTL(
+    fun isChainTrustedForContext(): IsChainTrustedForEUDIW<List<X509Certificate>, TrustAnchor> =
+        IsChainTrustedForContext.usingLoTL(
             dssOptions = DssOptions.usingFileCacheDataLoader(
                 fileCacheExpiration = 24.hours,
                 cacheDirectory = createTempDirectory("lotl-cache"),
@@ -75,8 +73,10 @@ object EUDIRefDevEnv {
                 put(VerificationContext.PubEAA, lotlSource(PUB_EAA_SVC_TYPE))
             },
             ttl = 10.seconds,
-        ),
-    )
+            validateCertificateChain = ValidateCertificateChainUsingPKIXJvm(customization = {
+                this.isRevocationEnabled = false
+            }),
+        )
 }
 
 class IsChainTrustedUsingLoTLTest {
