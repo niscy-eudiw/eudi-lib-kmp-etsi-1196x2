@@ -102,6 +102,8 @@ kotlin {
         val jvmAndAndroidTest by getting {
             dependencies {
                 implementation(libs.ktor.client.java)
+                implementation(libs.bouncy.castle)
+                implementation("eu.europa.ec.eudi:eudi-lib-jvm-sdjwt-kt:0.18.0")
             }
         }
 
