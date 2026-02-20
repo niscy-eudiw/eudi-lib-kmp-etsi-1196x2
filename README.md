@@ -30,20 +30,26 @@ This library is designed for:
 The library is divided into two main modules:
 
 ### 1. [Consultation](./consultation/README.md)
+
 The core module providing the fundamental abstractions and common validation logic.
 - **Features**: Functional architecture for trust discovery, attestation classification, and certificate chain validation.
 - **Platform Support**: Common (KMP).
 
+#### Key Abstractions
+
+- `VerificationContext`: Represents specific EUDI use cases (e.g., PID issuance).
+- `GetTrustAnchors`: A functional interface for retrieving anchors based on a query.
+- `IsChainTrustedForContext`: The elementary aggregation unit that combines trust anchors and validation logic for a set of supported contexts.
+- `AggegatedIsChainTrustedForContext`: A higher-level aggregator that combines multiple `IsChainTrustedForContext` instances.
+- `IsChainTrustedForEUDIW`: The orchestrator that resolves trust anchors and triggers validation.
+
+
 ### 2. [Consultation-DSS](./consultation-dss/README.md)
+
 An extension module that leverages the [Digital Signature Service (DSS)](https://github.com/esig/dss) to support ETSI Trusted Lists.
 - **Features**: Automated LOTL/TL synchronization, multi-tier caching (In-Memory, File System), and DSS-based validation.
 - **Platform Support**: JVM and Android.
 
-## Key Abstractions
-
-- `VerificationContext`: Represents specific EUDI use cases (e.g., PID issuance).
-- `GetTrustAnchors`: A functional interface for retrieving anchors based on a query.
-- `IsChainTrustedForEUDIW`: The orchestrator that resolves trust anchors and triggers validation.
 
 ## How to contribute
 

@@ -5,8 +5,8 @@ published in [ETSI TS 119 612 Trusted Lists](https://www.etsi.org/deliver/etsi_t
 
 Trusted Lists are fetched, parsed, and validated using [Digital Signature Service (DSS)](https://github.com/esig/dss).
 
-The module automates the process of fetching and verifying the 
-European List of Trusted Lists (LOTL). 
+The module automates the process of fetching and verifying the
+European List of Trusted Lists (LOTL).
 It wraps the stateful DSS `TLValidationJob` into the library's functional `GetTrustAnchors` interface.
 
 ## Quick Start
@@ -22,18 +22,18 @@ dependencies {
 ```
 
 > [!NOTE]
-> 
+>
 > This library exposes **only** the classes of `eu.europa.ec.joinup.sd-dss:dss-tsl-validation` and its transitive dependencies as `api`.
 
 > [!IMPORTANT]
-> 
+>
 > DSS abstracts certain utility APIs, and provides two implementations:
-> 
+>
 > * `dss-utils-apache-commons`: Implementation of dss-utils with Apache Commons libraries
 > * `dss-utils-google-guava`: Implementation of dss-utils with Google Guava
-> 
+>
 > Users of this library must also include the DSS implementation of their choice.
-> 
+>
 > ```kotlin
 > dependencies {
 >     implementation("eu.europa.ec.joinup.sd-dss:dss-utils-apache-commons:$dssVersion")
@@ -43,16 +43,16 @@ dependencies {
 > ```
 
 > [!IMPORTANT]
-> 
+>
 > DSS provides a JAXB-based XML implementation of a validation policy within the `eu.europa.ec.joinup.sd-dss:dss-policy-jaxb` module.
 > To load this validation policy implementation, users must also include the following dependency:
-> 
+>
 > ```kotlin
 > dependencies {
 >     implementation("eu.europa.ec.joinup.sd-dss:dss-policy-jaxb:$dssVersion")
 > }
 > ```
-> 
+>
 > More information is available [here](https://github.com/esig/dss/blob/master/dss-cookbook/src/main/asciidoc/_chapters/signature-validation.adoc#12-ades-validation-constraintspolicy).
 
 ### 2. Setup and Use
@@ -73,19 +73,26 @@ val pidLotl = LOTLSource().apply {
 }
 val pubEAALotl = LOTLSource().apply { }
 
-// 4. Defines mappings to verification contexts
-val trustSource = getTrustAnchorsFromLoTL.transform(buildMap{
-    put(VerificationContext.PID, pidLotl)
-    put(VerificationContext.PubEAA, pubEAALotl)
-})
-
-// 5. Instantiate the final validator
-val isTrusted = IsChainTrustedForEUDIW(
-    validateCertificateChain = ValidateCertificateChainJvm(),
-    getTrustAnchorsByContext = trustSource
+// 3. Create IsChainTrustedForContext instances for each context
+val pidValidator = IsChainTrustedForContext(
+    supportedContexts = setOf(VerificationContext.PID),
+    getTrustAnchors = getTrustAnchorsFromLoTL.transform(mapOf(VerificationContext.PID to pidLotl)),
+    validateCertificateChain = ValidateCertificateChainJvm()
 )
 
-// 6. Use it 
+val pubEAAValidator = IsChainTrustedForContext(
+    supportedContexts = setOf(VerificationContext.PubEAA),
+    getTrustAnchors = getTrustAnchorsFromLoTL.transform(mapOf(VerificationContext.PubEAA to pubEAALotl)),
+    validateCertificateChain = ValidateCertificateChainJvm()
+)
+
+// 4. Combine validators using AggegatedIsChainTrustedForContext
+val trustValidator = AggegatedIsChainTrustedForContext.of(pidValidator, pubEAAValidator)
+
+// 5. Instantiate the final validator
+val isTrusted = IsChainTrustedForEUDIW(trustValidator)
+
+// 6. Use it
 val result = isTrusted(chain, VerificationContext.PID)
 ```
 
@@ -106,9 +113,18 @@ D --> E{GetTrustAnchors}
 E -->|DSS Adapter| F[EU LOTL Source]
 F -->|Synchronize| G[National Trusted Lists]
 G -->|Extract| H[List of TrustAnchors]
-H --> I[ValidateCertificateChainJvm]
-I -->|PKIX Validation| J[Trusted / NotTrusted]
+
+subgraph Validation Approaches
+    H --> I1[ValidateCertificateChainJvm]
+    I1 -->|PKIX Validation| J1[Trusted / NotTrusted]
+    H --> I2[ValidateCertificateChainUsingDirectTrustJvm]
+    I2 -->|Direct Trust Validation| J2[Trusted / NotTrusted]
+end
 ```
+
+The DSS module supports both validation strategies:
+- **PKIX-based validation**: Traditional certificate chain validation using cryptographic PKIX algorithms
+- **Direct-trust validation**: Direct certificate matching where the head certificate is compared against trust anchors by subject and serial number
 
 ## Multi-Tier Caching Strategy
 
@@ -138,4 +154,3 @@ DssOptions.usingFileCacheDataLoader(
 ## Platform Support
 
 The library targets JVM and Android.
-

@@ -1,12 +1,12 @@
 # Consultation Module
 
-The EUDI ETSI 119 6x2 Consultation module 
-is a Kotlin implementation designed for the European Digital Identity (EUDI) Wallet ecosystem. 
+The EUDI ETSI 119 6x2 Consultation module
+is a Kotlin implementation designed for the European Digital Identity (EUDI) Wallet ecosystem.
 Its purpose is to provide an extensible and secure framework for Certificate Chain Validation against dynamic Trust Anchors.
 
-The module enables Wallets, Issuers, and Verifiers 
-to verify the trustworthiness of credentials (PIDs, EAAs) 
-and attestation objects (WIA, WUA) by navigating trust trees within 
+The module enables Wallets, Issuers, and Verifiers
+to verify the trustworthiness of credentials (PIDs, EAAs)
+and attestation objects (WIA, WUA) by navigating trust trees within
 the European Union's identity framework.
 
 ## Quick Start
@@ -37,16 +37,16 @@ val classifications = AttestationClassifications(
 ```kotlin
 val isChainTrusted : IsChainTrustedForEUDIW // Implementation of IsChainTrustedForEUDIW
 
-val validator = IsChainTrustedForAttestation(
+val isChainTrustedForAttestation = IsChainTrustedForAttestation(
     isChainTrustedForContext = isChainTrusted, // Implementation of IsChainTrustedForEUDIW
     classifications = classifications
 )
-val result = validator.issuance(chain, MDoc("eu.europa.ec.eudi.pid.1"))
+val result = isChainTrustedForAttestation.issuance(chain, MDoc("eu.europa.ec.eudi.pid.1"))
 ```
 
 ## Core abstractions
 
-The library separates the discovery of trust from the execution of validation logic using 
+The library separates the discovery of trust from the execution of validation logic using
 a high-level functional approach.
 
 🛡️ **Validation & Context**
@@ -55,13 +55,16 @@ a high-level functional approach.
   - `PID`, `PubEAA`, `QEAA`: For credentials.
   - `WalletInstanceAttestation`, `WalletUnitAttestation`: For wallet-specific attestations.
   - `WalletRelyingPartyRegistrationCertificate`: For Verifier/Issuer certificates.
-- `ValidateCertificateChain`: A functional abstraction of an engine that performs cryptographic PKIX validation of an X.509 chain against trust anchors.
+- `ValidateCertificateChain`: A functional interface defining the contract for certificate chain validation, with two main implementations:
+  - `ValidateCertificateChainUsingPKIX`: Performs traditional cryptographic PKIX validation (signature verification, path building, etc.)
+  - `ValidateCertificateChainUsingDirectTrust`: Performs direct certificate matching by subject and serial number
 - `IsChainTrustedForEUDIW`: The high-level orchestrator that resolves the correct trust anchors for a given context and triggers the validation engine.
 
 🔍 **Trust Discovery**
 
 - `GetTrustAnchors`: A functional interface for retrieving anchors based on a query (e.g., a Regex or a Context).
-- `GetTrustAnchorsForSupportedQueries`: A router that ensures queries are directed only to sources explicitly configured to handle them.
+- `IsChainTrustedForContext`: The elementary aggregation unit that combines trust anchors and validation logic for a set of supported contexts.
+- `AggegatedIsChainTrustedForContext`: A higher-level aggregator that combines multiple `IsChainTrustedForContext` instances.
 
 🏷️ **Attestation Classification**
 - `AttestationIdentifier`: Support for both ISO/IEC 18013-5 (MDoc), SD-JWT VC or other formats.
@@ -69,7 +72,7 @@ a high-level functional approach.
 
 ## Architecture Overview
 
-The following diagram illustrates how a raw attestation moves through the library to reach a trust decision
+The following diagram illustrates how a raw attestation moves through the library to reach a trust decision, supporting both PKIX-based and direct-trust validation approaches:
 
 ```mermaid
 graph TD
@@ -79,17 +82,29 @@ graph TD
     D --> E{GetTrustAnchors}
     E -->|Lookup| F[KeyStore / Remote Source]
     F -->|Return| G[List of TrustAnchors]
-    G --> H[ValidateCertificateChain]
-    H -->|PKIX Validation| I[CertificationChainValidation Result]
-    I -->|Trusted| J((Pass))
-    I -->|NotTrusted| K((Fail))
+    
+    subgraph Validation Approaches
+        G --> H1[ValidateCertificateChain]
+        H1 -->|PKIX Validation| I1[CertificationChainValidation Result]
+        G --> H2[ValidateCertificateChainUsingDirectTrust]
+        H2 -->|Direct Trust Validation| I2[CertificationChainValidation Result]
+    end
+    
+    I1 -->|Trusted| J((Pass))
+    I1 -->|NotTrusted| K((Fail))
+    I2 -->|Trusted| J((Pass))
+    I2 -->|NotTrusted| K((Fail))
 ```
+
+The library supports two validation strategies:
+- **PKIX-based validation**: Traditional certificate chain validation using cryptographic PKIX algorithms
+- **Direct-trust validation**: Direct certificate matching where the head certificate is compared against trust anchors by subject and serial number
 ## Implementation Choices
 
 🧩 **Functional & Declarative Architecture**
 
-The library favors Functional Interfaces and Composition over complex inheritance. 
-Patterns like `contraMap` allow developers to adapt query dialects, while the `or` and `plus` operators enable 
+The library favors Functional Interfaces and Composition over complex inheritance.
+Patterns like `contraMap` allow developers to adapt query dialects, while the `or` and `plus` operators enable
 the seamless merging of multiple trust sources.
 
 🚀 **Non-Blocking & Coroutine Native**
@@ -108,38 +123,39 @@ The consultation module is a **Kotlin Multiplatform (KMP)** module.
 
 ## Examples
 
-### Combing trust anchors from multiple sources
+### Combining trust anchors from multiple sources
 
 ```kotlin
 // 1. Define your specific trust fetchers
-val nationalIdFetcher = GetTrustAnchors { query -> 
+val nationalIdFetcher = GetTrustAnchors { query ->
     // Logic to fetch anchors from a local Secure Element or Government LOTL
-    loadGovernmentRoots() 
+    loadGovernmentRoots()
 }
 
-val universityFetcher = GetTrustAnchors { query -> 
+val universityFetcher = GetTrustAnchors { query ->
     // Logic to fetch anchors from a Sector-Specific University Trust List
     loadEducationRoots()
 }
 
-// 2 Create the routers
-val nationalRouter = GetTrustAnchorsForSupportedQueries(
-  supportedQueries = setOf(VerificationContext.PID),
-  getTrustAnchors = nationalIdFetcher
+// 2. Create IsChainTrustedForContext instances
+val isChainTrustedForPID = IsChainTrustedForContext(
+    supportedContexts = setOf(VerificationContext.PID),
+    getTrustAnchors = nationalIdFetcher,
+    validateCertificateChain = VerifyCertificateChainUsingDirectTrust()
 )
 
-val universityRouter = GetTrustAnchorsForSupportedQueries(
-  supportedQueries = setOf(VerificationContext.EAA("UniversityDiploma")),
-    getTrustAnchors = universityFetcher
+val isChainTrustedForUniversityDiploma = IsChainTrustedForContext(
+    supportedContexts = setOf(VerificationContext.EAA("UniversityDiploma")),
+    getTrustAnchors = universityFetcher,
+    validateCertificateChain = VerifyCertificateChainUsingDirectTrust()
 )
 
-// 3. Combine the routers
-val trustRouter = nationalRouter + universityRouter
+// 3. Combine the validators using AggegatedIsChainTrustedForContext
+val isChainTrusted = AggegatedIsChainTrustedForContext.of(isChainTrustedForPID, isChainTrustedForUniversityDiploma)
 
 // 4. Usage in the validation engine
-val pidIssuanceTrustAnchors = trustRouter(VerificationContext.PID)
+val pidIssuanceResult = isChainTrusted(chain, VerificationContext.PID)
 ```
-
 
 ### Using cached() for in-memory caching (AutoCloseable)
 
@@ -159,20 +175,16 @@ val getTrustAnchors: GetTrustAnchors<VerificationContext, TrustAnchor> = GetTrus
   expectedQueries = 10
 )
 
-// 3. Use the cached source 
+// 3. Use the cached source with IsChainTrustedForContext
 cachedSource.use { caching ->
-    val getTrustAnchorsByContext = 
-        GetTrustAnchorsForSupportedQueries(
-            supportedQueries = setOf(VerificationContext.PID), 
-            getTrustAnchors = caching
-        )  
-     
-    val isChainTrusted = 
-        IsChainTrustedForEUDIW(
-            ValidateCertificateChainJvm(),
-            getTrustAnchorsByContext
-        )
-   val result = isChainTrusted(chain, VerificationContext.PID)
+    val validator = IsChainTrustedForContext(
+        supportedContexts = setOf(VerificationContext.PID),
+        getTrustAnchors = caching,
+        validateCertificateChain = ValidateCertificateChainJvm()
+    )
+
+    val isChainTrusted = IsChainTrustedForEUDIW(validator)
+    val result = isChainTrusted(chain, VerificationContext.PID)
 }
 ```
 
