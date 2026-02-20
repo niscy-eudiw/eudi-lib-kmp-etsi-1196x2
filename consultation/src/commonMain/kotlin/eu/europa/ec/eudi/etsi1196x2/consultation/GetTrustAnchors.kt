@@ -64,7 +64,11 @@ public fun <C : Any, Q : Any, TA : Any, Q1 : Any> GetTrustAnchors<Q, TA>.validat
     transformation: Map<Q1, Q>,
     validateCertificateChain: ValidateCertificateChain<C, TA>,
 ): IsChainTrustedForContext<C, Q1, TA> =
-    IsChainTrustedForContext.transform(this, validateCertificateChain, transformation)
+    IsChainTrustedForContext(
+        transformation.keys,
+        contraMap { checkNotNull(transformation[it]) },
+        validateCertificateChain,
+    )
 
 /**
  * Combines this source with [other] to create a fallback chain.

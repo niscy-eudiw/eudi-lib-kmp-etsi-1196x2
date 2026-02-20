@@ -21,20 +21,21 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
  * @see SDJwtVc
  */
 public interface AttestationIdentifier {
+
+    /**
+     * ISO/IEC 18013-5 encoded attestation
+     * @param docType the document type of the attestation
+     */
+    public data class MDoc(val docType: String) : AttestationIdentifier
+
+    /**
+     * SD JWT VC encoded attestation
+     * @param vct the vct claim of the attestation
+     */
+    public data class SDJwtVc(val vct: String) : AttestationIdentifier
+
     public companion object
 }
-
-/**
- * ISO/IEC 18013-5 encoded attestation
- * @param docType the document type of the attestation
- */
-public data class MDoc(val docType: String) : AttestationIdentifier
-
-/**
- * SD JWT VC encoded attestation
- * @param vct the vct claim of the attestation
- */
-public data class SDJwtVc(val vct: String) : AttestationIdentifier
 
 /**
  * A predicate for attestation identifiers.
@@ -99,22 +100,22 @@ public fun interface AttestationIdentifierPredicate {
             AttestationIdentifierPredicate { it in identifiers }
 
         /**
-         * Creates a predicate that matches [MDoc] attestations having a document type matching the given regex.
+         * Creates a predicate that matches [AttestationIdentifier.MDoc] attestations having a document type matching the given regex.
          *
          * @param regex the regex to match the document type against.
          *
-         * @return a predicate that matches [MDoc] attestations with a document type matching the given regex.
+         * @return a predicate that matches [AttestationIdentifier.MDoc] attestations with a document type matching the given regex.
          */
         public fun mdocMatching(regex: Regex): AttestationIdentifierPredicate =
-            matchingRegex<MDoc>(regex, MDoc::docType)
+            matchingRegex<AttestationIdentifier.MDoc>(regex, AttestationIdentifier.MDoc::docType)
 
         /**
-         * Creates a predicate that matches [SDJwtVc] attestations having a vct claim matching the given regex.
+         * Creates a predicate that matches [AttestationIdentifier.SDJwtVc] attestations having a vct claim matching the given regex.
          * @param regex the regex to match the vct claim against.
-         * @return a predicate that matches [SDJwtVc] attestations with a vct claim matching the given regex.
+         * @return a predicate that matches [AttestationIdentifier.SDJwtVc] attestations with a vct claim matching the given regex.
          */
         public fun sdJwtVcMatching(regex: Regex): AttestationIdentifierPredicate =
-            matchingRegex<SDJwtVc>(regex, SDJwtVc::vct)
+            matchingRegex<AttestationIdentifier.SDJwtVc>(regex, AttestationIdentifier.SDJwtVc::vct)
     }
 }
 
@@ -214,14 +215,14 @@ public data class AttestationClassifications(
 }
 
 /**
- * A specialization of [IsChainTrustedForContext] for attestations
- * @param isChainTrustedForContext the function used to validate a certificate chain in a [VerificationContext].
+ * A specialization of [AggegatedIsChainTrustedForContext] for attestations
+ * @param isChainTrustedForEUDIW the function used to validate a certificate chain in a [VerificationContext].
  * @param classifications the way of classifying attestations
  * @param CHAIN the type of the certificate chain to be validated
  * @param TRUST_ANCHOR the type of the trust anchor to be used for validation
  */
 public class IsChainTrustedForAttestation<in CHAIN : Any, TRUST_ANCHOR : Any>(
-    private val isChainTrustedForContext: IsChainTrustedForContextF<CHAIN, VerificationContext, TRUST_ANCHOR>,
+    private val isChainTrustedForEUDIW: IsChainTrustedForEUDIW<CHAIN, TRUST_ANCHOR>,
     private val classifications: AttestationClassifications,
 ) {
 
@@ -255,7 +256,7 @@ public class IsChainTrustedForAttestation<in CHAIN : Any, TRUST_ANCHOR : Any>(
         chain: CHAIN,
         identifier: AttestationIdentifier,
     ): CertificationChainValidation<TRUST_ANCHOR>? =
-        issuanceOf(identifier)?.let { isChainTrustedForContext(chain, it) }
+        issuanceOf(identifier)?.let { isChainTrustedForEUDIW(chain, it) }
 
     /**
      * Validates a certificate chain for revocation of an attestation.
@@ -271,5 +272,5 @@ public class IsChainTrustedForAttestation<in CHAIN : Any, TRUST_ANCHOR : Any>(
         chain: CHAIN,
         identifier: AttestationIdentifier,
     ): CertificationChainValidation<TRUST_ANCHOR>? =
-        revocationContextOf(identifier)?.let { isChainTrustedForContext(chain, it) }
+        revocationContextOf(identifier)?.let { isChainTrustedForEUDIW(chain, it) }
 }

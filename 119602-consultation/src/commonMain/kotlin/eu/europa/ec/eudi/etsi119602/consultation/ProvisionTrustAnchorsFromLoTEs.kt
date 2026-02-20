@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.PKIObject
+import eu.europa.ec.eudi.etsi1196x2.consultation.AggegatedIsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingDirectTrust
@@ -37,13 +38,13 @@ public class ProvisionTrustAnchorsFromLoTEs<CHAIN : Any, CTX : Any, TRUST_ANCHOR
     public suspend operator fun invoke(
         loteLocationsSupported: SupportedLists<String>,
         parallelism: Int = 1,
-    ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> =
+    ): AggegatedIsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> =
         coroutineScope {
             loteLocationsSupported.cfgs().asFlow()
                 .map { cfg -> loadLoTEAndCreateTrustAnchorsProvider(cfg) }
                 .buffer(parallelism)
                 .filterNotNull()
-                .reduce { acc, provider -> acc + provider }
+                .fold(AggegatedIsChainTrustedForContext.empty()) { acc, provider -> acc + provider }
         }
 
     private suspend fun loadLoTEAndCreateTrustAnchorsProvider(

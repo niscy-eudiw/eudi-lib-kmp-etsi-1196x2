@@ -25,7 +25,7 @@ import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 
 /**
- * Creates an instance of [IsChainTrustedForContext] using a keystore for trust anchor retrieval.
+ * Creates an instance of [AggegatedIsChainTrustedForContext] using a keystore for trust anchor retrieval.
  *
  * @param dispatcher the coroutine dispatcher to use for fetching trust anchors from the keystore.
  *        Defaults to [Dispatchers.IO]
@@ -34,7 +34,7 @@ import java.security.cert.X509Certificate
  * @param regexPerVerificationContext a function that maps a verification context to a regular expression
  * @param validateCertificateChain the function used to validate a given certificate chain
  *
- * @return an instance of [IsChainTrustedForContext] that reads trust anchors from the given keystore.
+ * @return an instance of [AggegatedIsChainTrustedForContext] that reads trust anchors from the given keystore.
  */
 public fun <CTX : Any> IsChainTrustedForContext.Companion.usingKeyStore(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,

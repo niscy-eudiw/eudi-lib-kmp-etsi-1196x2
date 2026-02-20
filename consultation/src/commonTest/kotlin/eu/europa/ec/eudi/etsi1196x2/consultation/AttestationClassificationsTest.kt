@@ -19,10 +19,10 @@ import kotlin.test.*
 
 class AttestationClassificationsTest {
 
-    private val pidMDoc = MDoc(docType = "eu.europa.ec.eudi.pid.1")
-    private val pidSdJwt = SDJwtVc(vct = "urn:eudi:pid:1")
-    private val mdl = MDoc(docType = "org.iso.18013.5.1.mDL")
-    private val loyaltyCard = SDJwtVc(vct = "https://example.com/loyalty")
+    private val pidMDoc = AttestationIdentifier.MDoc(docType = "eu.europa.ec.eudi.pid.1")
+    private val pidSdJwt = AttestationIdentifier.SDJwtVc(vct = "urn:eudi:pid:1")
+    private val mdl = AttestationIdentifier.MDoc(docType = "org.iso.18013.5.1.mDL")
+    private val loyaltyCard = AttestationIdentifier.SDJwtVc(vct = "https://example.com/loyalty")
 
     // Test classify method - basic functionality
 

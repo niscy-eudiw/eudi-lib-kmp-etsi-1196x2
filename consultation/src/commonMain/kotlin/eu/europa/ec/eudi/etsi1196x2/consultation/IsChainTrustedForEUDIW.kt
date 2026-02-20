@@ -130,21 +130,9 @@ public sealed interface VerificationContext {
 }
 
 /**
- * A typealias for [IsChainTrustedForContext] having as context the [VerificationContext]
+ * A typealias for [IsChainTrustedForContextF] having as context the [VerificationContext]
  */
-public typealias IsChainTrustedForEUDIW<CHAIN, TRUST_ANCHOR> = IsChainTrustedForContext<CHAIN, VerificationContext, TRUST_ANCHOR>
-
-/**
- * Creates an instance of [IsChainTrustedForEUDIW]
- *
- * @param sources
- * @param CHAIN type representing a certificate chain
- * @param TRUST_ANCHOR type representing a trust anchor
- */
-public fun <CHAIN : Any, TRUST_ANCHOR : Any> IsChainTrustedForEUDIW(
-    sources: Map<Set<VerificationContext>, Pair<GetTrustAnchors<VerificationContext, TRUST_ANCHOR>, ValidateCertificateChain<CHAIN, TRUST_ANCHOR>>>,
-): IsChainTrustedForEUDIW<CHAIN, TRUST_ANCHOR> =
-    IsChainTrustedForContext.of(sources)
+public typealias IsChainTrustedForEUDIW<CHAIN, TRUST_ANCHOR> = IsChainTrustedForContextF<CHAIN, VerificationContext, TRUST_ANCHOR>
 
 public data class SupportedLists<out INFO : Any>(
     val pidProviders: INFO? = null,

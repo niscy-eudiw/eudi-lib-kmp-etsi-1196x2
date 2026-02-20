@@ -15,8 +15,10 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
-import eu.europa.ec.eudi.etsi1196x2.consultation.*
+import eu.europa.ec.eudi.etsi1196x2.consultation.CertificationChainValidation
+import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIXJvm
+import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.dss.EUDIRefDevEnv.httpLoader
 import eu.europa.esig.dss.spi.client.http.NativeHTTPDataLoader
 import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
@@ -61,7 +63,7 @@ object EUDIRefDevEnv {
 
     val httpLoader = ObservableHttpLoader(NativeHTTPDataLoader())
 
-    fun isChainTrustedForContext(): IsChainTrustedForEUDIW<List<X509Certificate>, TrustAnchor> =
+    fun isChainTrustedForContext() =
         IsChainTrustedForContext.usingLoTL(
             dssOptions = DssOptions.usingFileCacheDataLoader(
                 fileCacheExpiration = 24.hours,
@@ -81,7 +83,7 @@ object EUDIRefDevEnv {
 
 class IsChainTrustedUsingLoTLTest {
 
-    val isX5CTrusted: IsChainTrustedForEUDIW<List<String>, TrustAnchor> =
+    val isX5CTrusted =
         EUDIRefDevEnv.isChainTrustedForContext().contraMap(::certsFromX5C)
 
     @Test
@@ -108,7 +110,7 @@ class IsChainTrustedUsingLoTLTest {
 
 class IsChainTrustedUsingLoTLParallelTest {
 
-    val isX5CTrusted: IsChainTrustedForEUDIW<List<String>, TrustAnchor> =
+    val isX5CTrusted =
         EUDIRefDevEnv.isChainTrustedForContext().contraMap(::certsFromX5C)
 
     @Test

@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
-class IsChainTrustedForContextCompositionTest {
+class AggegatedIsChainTrustedForContextCompositionTest {
 
     private fun mockSource(value: String): GetTrustAnchors<String, String> = GetTrustAnchors { _ ->
         NonEmptyList(listOf(value))
@@ -47,7 +47,8 @@ class IsChainTrustedForContextCompositionTest {
             mockSource("v1").validator(setOf("q1"), mockChainValidator())
         val s2 =
             mockSource("v2").validator(setOf("q2"), mockChainValidator())
-        val combined = s1 plus s2
+        val combined =
+            AggegatedIsChainTrustedForContext.empty<Any, String, String>() + s1 + s2
 
         val r1 = combined.getTrustAnchors("q1")
         assertNotNull(r1)
