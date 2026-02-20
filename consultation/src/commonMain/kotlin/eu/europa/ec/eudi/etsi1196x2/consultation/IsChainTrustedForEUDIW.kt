@@ -142,9 +142,9 @@ public typealias IsChainTrustedForEUDIW<CHAIN, TRUST_ANCHOR> = IsChainTrustedFor
  * @param TRUST_ANCHOR type representing a trust anchor
  */
 public fun <CHAIN : Any, TRUST_ANCHOR : Any> IsChainTrustedForEUDIW(
-    sources: Map<Set<VerificationContext>, SourceAndValidate<CHAIN, VerificationContext, TRUST_ANCHOR>>,
+    sources: Map<Set<VerificationContext>, Pair<GetTrustAnchors<VerificationContext, TRUST_ANCHOR>, ValidateCertificateChain<CHAIN, TRUST_ANCHOR>>>,
 ): IsChainTrustedForEUDIW<CHAIN, TRUST_ANCHOR> =
-    IsChainTrustedForContext(sources)
+    IsChainTrustedForContext.of(sources)
 
 public data class SupportedLists<out INFO : Any>(
     val pidProviders: INFO? = null,
