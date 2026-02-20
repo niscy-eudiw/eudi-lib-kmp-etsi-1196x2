@@ -94,12 +94,13 @@ class DIGITTest {
                     loadLoTE = LoadLoTEFromHttp(this),
                 ),
                 svcTypePerCtx = DIGIT.SVC_TYPE_PER_CTX,
-                createTrustAnchor = { it },
+                createTrustAnchors = { it.x509Certificates.orEmpty() },
                 directTrust = ValidateCertificateChainUsingDirectTrust(
                     { _ -> error("Not used") },
                     { _ -> error("Not used") },
                 ),
                 pkix = ValidateCertificateChainUsingPKIX { _, _ -> error("Not used") },
+
             )
 
         return fromHttp(loteLocationsSupported, parallelism = 10)

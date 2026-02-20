@@ -16,6 +16,7 @@
 import JPPoC.LC_VCT
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.etsi119602.consultation.*
+import eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem.Companion.AlwaysIfDownloaded
 import eu.europa.ec.eudi.etsi119602.x509Certificate
 import eu.europa.ec.eudi.etsi1196x2.consultation.*
 import eu.europa.ec.eudi.sdjwt.*
@@ -132,6 +133,7 @@ class JPLoTEDownloaderTest {
     private suspend fun HttpClient.getThem(
         loteLocationsSupported: SupportedLists<String>,
         svcTypePerCtx: SupportedLists<LotEMata<VerificationContext>>,
+        provider: String? = null,
     ): AggegatedIsChainTrustedForContext<List<X509Certificate>, VerificationContext, TrustAnchor> {
         val fromHttp = ProvisionTrustAnchorsFromLoTEs(
             LoadLoTEAndPointers(
@@ -145,8 +147,10 @@ class JPLoTEDownloaderTest {
 
             ),
             svcTypePerCtx = svcTypePerCtx,
-            continueOnProblem = ContinueOnProblem.Companion.AlwaysIfDownloaded,
-            createTrustAnchor = { TrustAnchor(it.x509Certificate(), null) },
+            continueOnProblem = ContinueOnProblem.AlwaysIfDownloaded,
+            createTrustAnchors = { serviceDigitalIdentity ->
+                serviceDigitalIdentity.x509Certificates.orEmpty().map { TrustAnchor(it.x509Certificate(provider), null) }
+            },
             directTrust = ValidateCertificateChainUsingDirectTrustJvm,
             pkix = ValidateCertificateChainUsingPKIXJvm(customization = { isRevocationEnabled = false }),
         )

@@ -15,14 +15,8 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation
 
-import eu.europa.ec.eudi.etsi119602.PKIObject
-import eu.europa.ec.eudi.etsi1196x2.consultation.AggegatedIsChainTrustedForContext
-import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
-import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
-import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingDirectTrust
-import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIX
-import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
-import eu.europa.ec.eudi.etsi1196x2.consultation.validator
+import eu.europa.ec.eudi.etsi119602.ServiceDigitalIdentity
+import eu.europa.ec.eudi.etsi1196x2.consultation.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 
@@ -32,7 +26,7 @@ public class ProvisionTrustAnchorsFromLoTEs<CHAIN : Any, CTX : Any, TRUST_ANCHOR
     private val continueOnProblem: ContinueOnProblem = ContinueOnProblem.Never,
     private val directTrust: ValidateCertificateChainUsingDirectTrust<CHAIN, TRUST_ANCHOR, *>,
     private val pkix: ValidateCertificateChainUsingPKIX<CHAIN, TRUST_ANCHOR>,
-    private val createTrustAnchor: (PKIObject) -> TRUST_ANCHOR,
+    private val createTrustAnchors: (ServiceDigitalIdentity) -> List<TRUST_ANCHOR>,
 ) {
 
     public suspend operator fun invoke(
@@ -51,7 +45,7 @@ public class ProvisionTrustAnchorsFromLoTEs<CHAIN : Any, CTX : Any, TRUST_ANCHOR
         cfg: LoTECfg<CTX>,
     ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>? {
         val loaded = loadLoTE(cfg) ?: return null
-        val getTrustAnchors = GetTrustAnchorsFromLoTE(loaded, createTrustAnchor)
+        val getTrustAnchors = GetTrustAnchorsFromLoTE(loaded, createTrustAnchors)
         val validateCertificateChain =
             if (cfg.metadata.directTrust) directTrust else pkix
         val transformation = cfg.metadata.svcTypePerCtx
@@ -84,7 +78,7 @@ public class ProvisionTrustAnchorsFromLoTEs<CHAIN : Any, CTX : Any, TRUST_ANCHOR
             continueOnProblem: ContinueOnProblem = ContinueOnProblem.Never,
             directTrust: ValidateCertificateChainUsingDirectTrust<CHAIN, TRUST_ANCHOR, *>,
             pkix: ValidateCertificateChainUsingPKIX<CHAIN, TRUST_ANCHOR>,
-            createTrustAnchor: (PKIObject) -> TRUST_ANCHOR,
+            createTrustAnchors: (ServiceDigitalIdentity) -> List<TRUST_ANCHOR>,
         ): ProvisionTrustAnchorsFromLoTEs<CHAIN, VerificationContext, TRUST_ANCHOR> =
             ProvisionTrustAnchorsFromLoTEs(
                 loadLoTEAndPointers,
@@ -92,7 +86,7 @@ public class ProvisionTrustAnchorsFromLoTEs<CHAIN : Any, CTX : Any, TRUST_ANCHOR
                 continueOnProblem,
                 directTrust,
                 pkix,
-                createTrustAnchor,
+                createTrustAnchors,
             )
     }
 }

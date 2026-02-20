@@ -16,10 +16,11 @@
 package eu.europa.ec.eudi.etsi119602.consultation
 
 import eu.europa.ec.eudi.etsi119602.ListOfTrustedEntities
-import eu.europa.ec.eudi.etsi119602.PKIObject
+import eu.europa.ec.eudi.etsi119602.ServiceDigitalIdentity
 import eu.europa.ec.eudi.etsi119602.TrustedEntityService
 import eu.europa.ec.eudi.etsi119602.URI
-import eu.europa.ec.eudi.etsi1196x2.consultation.*
+import eu.europa.ec.eudi.etsi1196x2.consultation.GetTrustAnchors
+import eu.europa.ec.eudi.etsi1196x2.consultation.NonEmptyList
 
 /**
  * A loaded list of trusted entities, including
@@ -35,14 +36,13 @@ public data class LoadedLoTE(
 
 public class GetTrustAnchorsFromLoTE<out TRUST_ANCHOR : Any>(
     private val loadedLote: LoadedLoTE,
-    private val createTrustAnchor: (PKIObject) -> TRUST_ANCHOR,
+    private val createTrustAnchors: (ServiceDigitalIdentity) -> List<TRUST_ANCHOR>,
 ) : GetTrustAnchors<URI, TRUST_ANCHOR> {
 
     override suspend fun invoke(query: URI): NonEmptyList<TRUST_ANCHOR>? {
         val certs =
             loadedLote.servicesOfType(query).flatMap { trustedService ->
-                trustedService.information.digitalIdentity.x509Certificates.orEmpty()
-                    .map(createTrustAnchor)
+                createTrustAnchors(trustedService.information.digitalIdentity)
             }
         return NonEmptyList.nelOrNull(certs)
     }
@@ -54,4 +54,7 @@ public class GetTrustAnchorsFromLoTE<out TRUST_ANCHOR : Any>(
     private fun ListOfTrustedEntities.servicesOf(svcType: URI): List<TrustedEntityService> =
         entities.orEmpty()
             .flatMap { it.services.filter { svc -> svc.information.typeIdentifier == svcType } }
+
+    public companion object {
+    }
 }
