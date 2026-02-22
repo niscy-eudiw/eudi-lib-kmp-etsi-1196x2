@@ -38,7 +38,7 @@ internal class AsyncCache<A : Any, B>(
     private val cache =
         object : LinkedHashMap<A, Entry<B>>(maxCacheSize, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<A, Entry<B>>) =
-                size > maxCacheSize
+                size >= maxCacheSize
         }
 
     override suspend fun invoke(key: A): B {
