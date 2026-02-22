@@ -81,7 +81,7 @@ class DIGITTest {
 
     private suspend fun HttpClient.get(
         loteLocationsSupported: SupportedLists<String>,
-    ): AggegatedIsChainTrustedForContext<*, VerificationContext, PKIObject> {
+    ): ComposeChainTrust<*, VerificationContext, PKIObject> {
         val fromHttp =
             ProvisionTrustAnchorsFromLoTEs.eudiw(
                 LoadLoTEAndPointers(
