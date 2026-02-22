@@ -215,7 +215,7 @@ public data class AttestationClassifications(
 }
 
 /**
- * A specialization of [AggegatedIsChainTrustedForContext] for attestations
+ * A specialization of [ComposeChainTrust] for attestations
  * @param isChainTrustedForEUDIW the function used to validate a certificate chain in a [VerificationContext].
  * @param classifications the way of classifying attestations
  * @param CHAIN the type of the certificate chain to be validated

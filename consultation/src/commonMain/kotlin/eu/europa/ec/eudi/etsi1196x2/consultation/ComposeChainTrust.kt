@@ -30,7 +30,7 @@ import kotlin.collections.plus
  * @param CTX the type of the verification context
  * @param TRUST_ANCHOR the type of the trust anchor to be used for validation
  */
-public class AggegatedIsChainTrustedForContext<in CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any>
+public class ComposeChainTrust<in CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any>
 private constructor(private val sources: Map<Set<CTX>, IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>>) :
     IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> {
 
@@ -60,7 +60,7 @@ private constructor(private val sources: Map<Set<CTX>, IsChainTrustedForContext<
         sources.values.firstOrNull { ctx in it }
 
     /**
-     * Combines two instances of [AggegatedIsChainTrustedForContext] into one.
+     * Combines two instances of [ComposeChainTrust] into one.
      * It is required that the two instances have disjoint sets of supported contexts.
      *
      * @param other the other source to combine with
@@ -69,24 +69,24 @@ private constructor(private val sources: Map<Set<CTX>, IsChainTrustedForContext<
      */
     @Throws(IllegalArgumentException::class)
     public infix operator fun plus(
-        other: AggegatedIsChainTrustedForContext<@UnsafeVariance CHAIN, CTX, TRUST_ANCHOR>,
-    ): AggegatedIsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> {
+        other: ComposeChainTrust<@UnsafeVariance CHAIN, CTX, TRUST_ANCHOR>,
+    ): ComposeChainTrust<CHAIN, CTX, TRUST_ANCHOR> {
         val common = this.supportedContexts.intersect(other.supportedContexts)
         require(common.isEmpty()) { "Sources have overlapping queries: $common" }
-        return AggegatedIsChainTrustedForContext(this.sources + other.sources)
+        return ComposeChainTrust(this.sources + other.sources)
     }
 
     @Throws(IllegalArgumentException::class)
     public infix operator fun plus(
         other: IsChainTrustedForContext<@UnsafeVariance CHAIN, CTX, TRUST_ANCHOR>,
-    ): AggegatedIsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> {
+    ): ComposeChainTrust<CHAIN, CTX, TRUST_ANCHOR> {
         val common = this.supportedContexts.intersect(other.supportedContexts)
         require(common.isEmpty()) { "Sources have overlapping queries: $common" }
-        return AggegatedIsChainTrustedForContext(this.sources + (other.supportedContexts to other))
+        return ComposeChainTrust(this.sources + (other.supportedContexts to other))
     }
 
     /**
-     * Creates a new [AggegatedIsChainTrustedForContext]
+     * Creates a new [ComposeChainTrust]
      * that applies the specified recovery logic in addition to the current
      *
      * Do not use this method unless you know what you are doing.
@@ -102,25 +102,25 @@ private constructor(private val sources: Map<Set<CTX>, IsChainTrustedForContext<
     ): IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> =
         UnsafeIsChainTrustedForContext(this, recovery)
 
-    public fun <C2 : Any> contraMap(transformation: (C2) -> CHAIN): AggegatedIsChainTrustedForContext<C2, CTX, TRUST_ANCHOR> =
-        AggegatedIsChainTrustedForContext(
+    public fun <C2 : Any> contraMap(transformation: (C2) -> CHAIN): ComposeChainTrust<C2, CTX, TRUST_ANCHOR> =
+        ComposeChainTrust(
             sources.mapValues { (_, src) -> src.contraMap(transformation) },
         )
 
     public companion object {
 
-        public fun <CHAIN : Any, CTX : Any, TA : Any> empty(): AggegatedIsChainTrustedForContext<CHAIN, CTX, TA> =
-            AggegatedIsChainTrustedForContext(emptyMap())
+        public fun <CHAIN : Any, CTX : Any, TA : Any> empty(): ComposeChainTrust<CHAIN, CTX, TA> =
+            ComposeChainTrust(emptyMap())
 
         public operator fun <CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any> invoke(
             source: IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>,
-        ): AggegatedIsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> =
-            AggegatedIsChainTrustedForContext(mapOf(source.supportedContexts to source))
+        ): ComposeChainTrust<CHAIN, CTX, TRUST_ANCHOR> =
+            ComposeChainTrust(mapOf(source.supportedContexts to source))
 
         @Throws(IllegalArgumentException::class)
         public fun <CHAIN : Any, CTX : Any, TA : Any> of(
             vararg sources: IsChainTrustedForContext<CHAIN, CTX, TA>,
-        ): AggegatedIsChainTrustedForContext<CHAIN, CTX, TA> =
+        ): ComposeChainTrust<CHAIN, CTX, TA> =
             sources.fold(empty()) { acc, next -> acc + next }
     }
 }

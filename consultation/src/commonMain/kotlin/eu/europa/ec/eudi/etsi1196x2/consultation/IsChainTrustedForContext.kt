@@ -20,7 +20,7 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
  * - share the same [GetTrustAnchors] source
  * - share the same [ValidateCertificateChain]
  *
- * That's the elementary aggregation unit of [AggegatedIsChainTrustedForContext].
+ * That's the elementary aggregation unit of [ComposeChainTrust].
  */
 public class IsChainTrustedForContext<in CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any>(
     public val supportedContexts: Set<CTX>,
@@ -46,8 +46,8 @@ public class IsChainTrustedForContext<in CHAIN : Any, CTX : Any, TRUST_ANCHOR : 
     @Throws(IllegalArgumentException::class)
     public infix operator fun plus(
         other: IsChainTrustedForContext<@UnsafeVariance CHAIN, CTX, TRUST_ANCHOR>,
-    ): AggegatedIsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> =
-        AggegatedIsChainTrustedForContext.of(this, other)
+    ): ComposeChainTrust<CHAIN, CTX, TRUST_ANCHOR> =
+        ComposeChainTrust.of(this, other)
 
     public fun <C1 : Any> contraMap(transformation: (C1) -> CHAIN): IsChainTrustedForContext<C1, CTX, TRUST_ANCHOR> =
         IsChainTrustedForContext(supportedContexts, getTrustAnchors, validateCertificateChain.contraMap(transformation))

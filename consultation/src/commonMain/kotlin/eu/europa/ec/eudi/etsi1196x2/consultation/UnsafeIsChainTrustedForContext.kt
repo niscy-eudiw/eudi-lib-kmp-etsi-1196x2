@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
  */
 @SensitiveApi
 internal class UnsafeIsChainTrustedForContext<in CHAIN : Any, CTX : Any, out TRUST_ANCHOR : Any>(
-    private val primary: AggegatedIsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>,
+    private val primary: ComposeChainTrust<CHAIN, CTX, TRUST_ANCHOR>,
     private val recovery: (CTX, CertificationChainValidation.NotTrusted) -> IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR>?,
 ) : IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> {
 

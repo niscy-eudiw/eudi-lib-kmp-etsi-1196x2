@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
-import eu.europa.ec.eudi.etsi1196x2.consultation.AggegatedIsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChain
 import eu.europa.ec.eudi.etsi1196x2.consultation.cached
@@ -30,7 +29,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 
 /**
- * Creates an instance of [AggegatedIsChainTrustedForContext] using a trusted list of trust anchors (LoTL) and a file cache loader.
+ * Creates an instance of [IsChainTrustedForContext] using a trusted list of trust anchors (LoTL) and a file cache loader.
  * The implementation has the following characteristics:
  * - Utilizes a file cache loader to load trusted lists from the file system
  * - Depending on the file cache loader configuration, the file downloader may use an online fetcher to
@@ -38,7 +37,7 @@ import kotlin.time.Duration
  * - Given that [FileCacheDataLoader] is blocking, it creates a suspendable and cachable wrapper around it using
  *   [GetTrustAnchorsFromLoTL].
  *
- * The example creates an [AggegatedIsChainTrustedForContext] that:
+ * The example creates an [IsChainTrustedForContext] that:
  * - Supports PUB EAA
  * - Caches calls in memory for 10 minutes
  * - Every 10 minutes, the file cache is being used
