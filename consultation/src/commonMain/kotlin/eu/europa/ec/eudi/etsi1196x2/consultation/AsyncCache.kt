@@ -38,7 +38,7 @@ internal class AsyncCache<A : Any, B>(
     private val cache =
         object : LinkedHashMap<A, Entry<B>>(maxCacheSize, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<A, Entry<B>>) =
-                size > maxCacheSize
+                size >= maxCacheSize
         }
 
     override suspend fun invoke(key: A): B {
@@ -74,6 +74,19 @@ internal class AsyncCache<A : Any, B>(
         }
     }
 
+    /**
+     * Closes this cache and cancels all in-flight computations.
+     *
+     * This method:
+     * - Cancels the internal coroutine scope, which cancels all ongoing computations
+     * - Clears the cache entries
+     * - Prevents any further invocations (will throw [IllegalStateException])
+     *
+     * **Important:** This method provides immediate cancellation semantics.
+     * All in-flight computations are cancelled when the coroutine scope is cancelled.
+     * If you need to wait for in-flight operations to complete gracefully,
+     * you should track and await them before calling close().
+     */
     override fun close() {
         if (cacheScope.isActive) {
             cacheScope.cancel()
