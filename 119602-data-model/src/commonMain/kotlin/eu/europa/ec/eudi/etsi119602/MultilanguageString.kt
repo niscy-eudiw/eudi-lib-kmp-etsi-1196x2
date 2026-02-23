@@ -64,11 +64,36 @@ public value class MultilingualStringValue(public val value: String) {
             // Rule 7: Simple check for markup-like patterns (tags)
             // While a full parser is complex, Rule 7 forbids mark-up elements/tags.
             if (s.contains("<") && s.contains(">")) {
-                // Heuristic: if it looks like an XML/HTML tag, reject it.
-                if (Regex("<[^>]+>").containsMatchIn(s)) return false
+                if (containsHtmlLikeTags(s)) return false
             }
 
             return true
+        }
+
+        /**
+         * Checks for HTML-like tags without using regex to avoid ReDoS vulnerabilities.
+         * Returns true if the string contains patterns that look like markup tags.
+         */
+        private fun containsHtmlLikeTags(s: String): Boolean {
+            var i = 0
+            while (i < s.length) {
+                if (s[i] == '<') {
+                    // Found opening bracket, look for closing bracket
+                    var j = i + 1
+                    var hasContent = false
+                    while (j < s.length && s[j] != '>') {
+                        hasContent = true
+                        j++
+                    }
+                    // If we found a closing bracket with content in between, it's a tag
+                    if (j < s.length && hasContent) {
+                        return true
+                    }
+                    i = j
+                }
+                i++
+            }
+            return false
         }
 
         private fun isCodePointValid(cp: Int): Boolean =

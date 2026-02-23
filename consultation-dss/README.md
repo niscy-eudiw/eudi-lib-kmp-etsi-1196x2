@@ -86,8 +86,8 @@ val pubEAAValidator = IsChainTrustedForContext(
     validateCertificateChain = ValidateCertificateChainJvm()
 )
 
-// 4. Combine validators using AggegatedIsChainTrustedForContext
-val trustValidator = AggegatedIsChainTrustedForContext.of(pidValidator, pubEAAValidator)
+// 4. Combine validators using ComposeChainTrust
+val trustValidator = ComposeChainTrust.of(pidValidator, pubEAAValidator)
 
 // 5. Instantiate the final validator
 val isTrusted = IsChainTrustedForEUDIW(trustValidator)

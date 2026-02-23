@@ -40,7 +40,7 @@ The core module providing the fundamental abstractions and common validation log
 - `VerificationContext`: Represents specific EUDI use cases (e.g., PID issuance).
 - `GetTrustAnchors`: A functional interface for retrieving anchors based on a query.
 - `IsChainTrustedForContext`: The elementary aggregation unit that combines trust anchors and validation logic for a set of supported contexts.
-- `AggegatedIsChainTrustedForContext`: A higher-level aggregator that combines multiple `IsChainTrustedForContext` instances.
+- `ComposeChainTrust`: A higher-level aggregator that combines multiple `IsChainTrustedForContext` instances.
 - `IsChainTrustedForEUDIW`: The orchestrator that resolves trust anchors and triggers validation.
 
 

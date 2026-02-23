@@ -16,7 +16,6 @@
 import JPPoC.LC_VCT
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.etsi119602.consultation.*
-import eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem.Companion.AlwaysIfDownloaded
 import eu.europa.ec.eudi.etsi119602.x509Certificate
 import eu.europa.ec.eudi.etsi1196x2.consultation.*
 import eu.europa.ec.eudi.sdjwt.*
@@ -134,7 +133,7 @@ class JPLoTEDownloaderTest {
         loteLocationsSupported: SupportedLists<String>,
         svcTypePerCtx: SupportedLists<LotEMata<VerificationContext>>,
         provider: String? = null,
-    ): AggegatedIsChainTrustedForContext<List<X509Certificate>, VerificationContext, TrustAnchor> {
+    ): ComposeChainTrust<List<X509Certificate>, VerificationContext, TrustAnchor> {
         val fromHttp = ProvisionTrustAnchorsFromLoTEs(
             LoadLoTEAndPointers(
                 constraints = LoadLoTEAndPointers.Constraints(

@@ -64,7 +64,7 @@ a high-level functional approach.
 
 - `GetTrustAnchors`: A functional interface for retrieving anchors based on a query (e.g., a Regex or a Context).
 - `IsChainTrustedForContext`: The elementary aggregation unit that combines trust anchors and validation logic for a set of supported contexts.
-- `AggegatedIsChainTrustedForContext`: A higher-level aggregator that combines multiple `IsChainTrustedForContext` instances.
+- `ComposeChainTrust`: A higher-level aggregator that combines multiple `IsChainTrustedForContext` instances.
 
 🏷️ **Attestation Classification**
 - `AttestationIdentifier`: Support for both ISO/IEC 18013-5 (MDoc), SD-JWT VC or other formats.
@@ -150,8 +150,8 @@ val isChainTrustedForUniversityDiploma = IsChainTrustedForContext(
     validateCertificateChain = VerifyCertificateChainUsingDirectTrust()
 )
 
-// 3. Combine the validators using AggegatedIsChainTrustedForContext
-val isChainTrusted = AggegatedIsChainTrustedForContext.of(isChainTrustedForPID, isChainTrustedForUniversityDiploma)
+// 3. Combine the validators using ComposeChainTrust
+val isChainTrusted = ComposeChainTrust.of(isChainTrustedForPID, isChainTrustedForUniversityDiploma)
 
 // 4. Usage in the validation engine
 val pidIssuanceResult = isChainTrusted(chain, VerificationContext.PID)

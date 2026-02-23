@@ -40,6 +40,17 @@ public class GetTrustAnchorsFromLoTL(
             NonEmptyList.nelOrNull(trustAnchors)
         }
 
+    /**
+     * Runs the DSS validation job for the given LOTL source.
+     *
+     * Note: This method performs blocking I/O operations via the DSS library's
+     * [TLValidationJob.onlineRefresh]. It is called from a coroutine context
+     * with the [DssOptions.validateJobDispatcher] (defaults to [Dispatchers.IO]),
+     * ensuring blocking operations don't block coroutine threads.
+     *
+     * @param lotlSource the LOTL source to validate
+     * @return list of trust anchors extracted from the validated trusted lists
+     */
     private fun runValidationJobFor(lotlSource: LOTLSource): List<TrustAnchor> =
         with(TrustedListsCertificateSource()) {
             createValidationJob(lotlSource).onlineRefresh()

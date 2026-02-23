@@ -246,7 +246,7 @@ internal constructor(
         public fun Int.requireValidSequenceNumber(): Int =
             apply {
                 require(this >= ETSI19602.INITIAL_SEQUENCE_NUMBER) {
-                    "${ETSI19602.LOTE_SEQUENCE_NUMBER} me equal or greater than ${ETSI19602.INITIAL_SEQUENCE_NUMBER}, got $this"
+                    "${ETSI19602.LOTE_SEQUENCE_NUMBER} must be equal or greater than ${ETSI19602.INITIAL_SEQUENCE_NUMBER}, got $this"
                 }
             }
     }
