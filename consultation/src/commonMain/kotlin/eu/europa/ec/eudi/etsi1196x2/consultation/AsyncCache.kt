@@ -22,7 +22,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration
 
-internal class AsyncCache<A : Any, B>(
+public class AsyncCache<A : Any, B>(
     cacheDispatcher: CoroutineDispatcher,
     private val clock: Clock,
     private val ttl: Duration,
@@ -40,6 +40,26 @@ internal class AsyncCache<A : Any, B>(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<A, Entry<B>>) =
                 size >= maxCacheSize
         }
+
+    init {
+        if (ttl.isPositive() && ttl != Duration.INFINITE) {
+            cacheScope.launch {
+                while (isActive) {
+                    delay(ttl)
+                    val now = clock.now().toEpochMilliseconds()
+                    mutex.withLock {
+                        val iterator = cache.entries.iterator()
+                        while (iterator.hasNext()) {
+                            val entry = iterator.next().value
+                            if ((now - entry.createdAt) >= ttl.inWholeMilliseconds) {
+                                iterator.remove()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     override suspend fun invoke(key: A): B {
         if (!cacheScope.isActive) {

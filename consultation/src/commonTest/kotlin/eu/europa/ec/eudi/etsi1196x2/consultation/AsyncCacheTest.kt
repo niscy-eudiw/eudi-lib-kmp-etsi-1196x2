@@ -41,23 +41,23 @@ class AsyncCacheTest {
         val ttl = 1000.milliseconds
         val clock = TestClock(testScheduler)
 
-        val cache = AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
+        AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
             if (key == "fail") {
                 throw RuntimeException("Planned failure")
             }
             "value-$key"
-        }
+        }.use { cache ->
+            // 1. Trigger a failing call
+            try {
+                cache("fail")
+            } catch (_: RuntimeException) {
+            }
 
-        // 1. Trigger a failing call
-        try {
-            cache("fail")
-        } catch (_: RuntimeException) {
+            // 2. Try another call. If the scope was cancelled, this might fail or hang
+            // depending on how the scope is used. In our case, scope.async will fail immediately if cancelled.
+            val result = cache("success")
+            assertEquals("value-success", result)
         }
-
-        // 2. Try another call. If the scope was cancelled, this might fail or hang
-        // depending on how the scope is used. In our case, scope.async will fail immediately if cancelled.
-        val result = cache("success")
-        assertEquals("value-success", result)
     }
 
     @Test
@@ -67,48 +67,78 @@ class AsyncCacheTest {
         val ttl = 100.milliseconds
         val clock = TestClock(testScheduler)
 
-        val cache = AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
+        AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
             supplierCalls++
             if (key == "fail" && supplierCalls == 1) {
                 delay(200) // Longer than TTL
                 throw RuntimeException("Planned failure")
             }
             "value"
-        }
-
-        // 1. Trigger a failing call
-        val job1 = launch {
-            try {
-                cache("fail")
-            } catch (_: Throwable) {
-                // Ignore expected failure
+        }.use { cache ->
+            // 1. Trigger a failing call
+            val job1 = launch {
+                try {
+                    cache("fail")
+                } catch (_: Throwable) {
+                    // Ignore expected failure
+                }
             }
+
+            // Advance a bit to start job1
+            advanceTimeBy(10)
+            runCurrent()
+
+            // 2. Wait for TTL to pass
+            advanceTimeBy(150)
+            runCurrent()
+
+            // 3. Trigger a successful call for same key (since it's expired)
+            // This will replace the "fail" entry in cache
+            val value = cache("fail")
+            assertEquals("value", value)
+            assertEquals(2, supplierCalls)
+
+            // At this point, the cache has the SUCCESSFUL entry.
+
+            // 4. Advance time to let the FIRST (failing) call complete its delay and trigger handleFailure
+            advanceTimeBy(40) // 160 + 40 = 200ms
+            runCurrent()
+            job1.join()
+
+            // 5. Check if the SUCCESSFUL entry is still there or was wrongly evicted
+            // At 200ms, Call 2's entry (created at 160ms) is still valid (TTL 100)
+            cache("fail")
+            assertEquals(2, supplierCalls, "Supplier should NOT have been called again - entry was wrongly evicted!")
         }
+    }
 
-        // Advance a bit to start job1
-        advanceTimeBy(10)
-        runCurrent()
+    @Test
+    fun backgroundCleanupRemovesExpiredEntries() = runTest {
+        var supplierCalls = 0
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        val ttl = 100.milliseconds
+        val clock = TestClock(testScheduler)
 
-        // 2. Wait for TTL to pass
-        advanceTimeBy(150)
-        runCurrent()
+        AsyncCache<String, String>(testDispatcher, clock, ttl, 10) { key ->
+            supplierCalls++
+            "value-$key"
+        }.use { cache ->
 
-        // 3. Trigger a successful call for same key (since it's expired)
-        // This will replace the "fail" entry in cache
-        val value = cache("fail")
-        assertEquals("value", value)
-        assertEquals(2, supplierCalls)
+            // 1. Populate cache
+            cache("key1")
+            assertEquals(1, supplierCalls)
 
-        // At this point, the cache has the SUCCESSFUL entry.
+            // 2. Advance time exactly to TTL
+            // At this point, the background cleanup job should have started
+            // and its first 'delay(ttl)' is about to finish
+            advanceTimeBy(ttl)
+            runCurrent()
 
-        // 4. Advance time to let the FIRST (failing) call complete its delay and trigger handleFailure
-        advanceTimeBy(40) // 160 + 40 = 200ms
-        runCurrent()
-        job1.join()
-
-        // 5. Check if the SUCCESSFUL entry is still there or was wrongly evicted
-        // At 200ms, Call 2's entry (created at 160ms) is still valid (TTL 100)
-        cache("fail")
-        assertEquals(2, supplierCalls, "Supplier should NOT have been called again - entry was wrongly evicted!")
+            // 3. The entry is now expired (now - createdAt == ttl)
+            // Check if supplier is called again for same key,
+            // which would mean it was removed by cleanup
+            cache("key1")
+            assertEquals(2, supplierCalls, "Background cleanup should have removed expired entry")
+        }
     }
 }
