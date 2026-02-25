@@ -45,7 +45,7 @@ public class GetTrustAnchorsFromLoTL(
      *
      * Note: This method performs blocking I/O operations via the DSS library's
      * [TLValidationJob.onlineRefresh]. It is called from a coroutine context
-     * with the [DssOptions.validateJobDispatcher] (defaults to [Dispatchers.IO]),
+     * with the [DssOptions.validateJobDispatcher] (defaults to [kotlinx.coroutines.Dispatchers.IO]),
      * ensuring blocking operations don't block coroutine threads.
      *
      * @param lotlSource the LOTL source to validate
