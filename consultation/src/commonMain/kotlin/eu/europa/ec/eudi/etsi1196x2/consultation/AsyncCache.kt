@@ -27,6 +27,7 @@ public class AsyncCache<A : Any, B>(
     private val clock: Clock,
     private val ttl: Duration,
     private val maxCacheSize: Int,
+    cleanupExpired: Boolean = true,
     private val supplier: suspend (A) -> B,
 ) : suspend (A) -> B, AutoCloseable {
 
@@ -42,22 +43,8 @@ public class AsyncCache<A : Any, B>(
         }
 
     init {
-        if (ttl.isPositive() && ttl != Duration.INFINITE) {
-            cacheScope.launch {
-                while (isActive) {
-                    delay(ttl)
-                    val now = clock.now().toEpochMilliseconds()
-                    mutex.withLock {
-                        val iterator = cache.entries.iterator()
-                        while (iterator.hasNext()) {
-                            val entry = iterator.next().value
-                            if ((now - entry.createdAt) >= ttl.inWholeMilliseconds) {
-                                iterator.remove()
-                            }
-                        }
-                    }
-                }
-            }
+        if (cleanupExpired && ttl.isPositive() && ttl != Duration.INFINITE) {
+            launchCleanup()
         }
     }
 
@@ -111,6 +98,25 @@ public class AsyncCache<A : Any, B>(
         if (cacheScope.isActive) {
             cacheScope.cancel()
             cache.clear()
+        }
+    }
+
+    private fun launchCleanup() {
+        check(ttl.isPositive() && ttl != Duration.INFINITE) { "TTL must be positive and not infinite" }
+        cacheScope.launch {
+            while (isActive) {
+                delay(ttl)
+                val now = clock.now().toEpochMilliseconds()
+                mutex.withLock {
+                    val iterator = cache.entries.iterator()
+                    while (iterator.hasNext()) {
+                        val entry = iterator.next().value
+                        if ((now - entry.createdAt) >= ttl.inWholeMilliseconds) {
+                            iterator.remove()
+                        }
+                    }
+                }
+            }
         }
     }
 }
