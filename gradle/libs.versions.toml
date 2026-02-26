@@ -10,12 +10,13 @@ maven-publish = "0.34.0"
 spotless = "8.2.1"
 ktlint = "1.2.1"
 dependency-check = "12.2.0"
-kover = "0.9.5"
+kover = "0.9.7"
 dokka = "2.1.0"
 dss = "6.4.RC1"
 atomicfu = "0.27.0"
 bouncyCastle = "1.83"
 kotlinx-io = "0.7.0"
+slf4j = "2.0.17"
 
 [libraries]
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
@@ -39,6 +40,7 @@ dss-tsl-validation = { module = "eu.europa.ec.joinup.sd-dss:dss-tsl-validation" 
 dss-utils-guava = { module = "eu.europa.ec.joinup.sd-dss:dss-utils-google-guava" }
 bouncy-castle = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncyCastle" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
+slf4j-simple = {module ="org.slf4j:slf4j-simple", version.ref="slf4j"}
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

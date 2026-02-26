@@ -102,6 +102,7 @@ kotlin {
         val jvmAndAndroidTest by getting {
             dependencies {
                 implementation(libs.dss.utils.guava)
+                implementation("org.slf4j:slf4j-simple:2.0.12")
             }
         }
     }
