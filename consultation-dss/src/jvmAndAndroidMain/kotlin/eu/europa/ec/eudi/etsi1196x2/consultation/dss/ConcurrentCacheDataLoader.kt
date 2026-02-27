@@ -48,16 +48,17 @@ import kotlin.time.Duration.Companion.seconds
  * - **Atomic file writes** (write to temp, then atomic move)
  *
  * Use this loader when multiple coroutines may concurrently fetch trust lists,
- * especially in high-concurrency scenarios where DSS's [FileCacheDataLoader] may
+ * especially in high-concurrency scenarios where DSS's [eu.europa.esig.dss.service.http.commons.FileCacheDataLoader] may
  * experience race conditions.
+ *
+ * File cache expiration uses the system clock to ensure consistency with filesystem timestamps.
  *
  * @param httpLoader the underlying HTTP loader for fetching remote resources
  * @param fileCacheExpiration duration after which cached files are considered stale
  * @param cacheDirectory directory for file cache; defaults to system temp directory
  * @param cacheDispatcher coroutine dispatcher for cache operations
- * @param clock time source for cache expiration
  * @param httpCacheTtl TTL for in-memory HTTP response cache
- * @param maxCacheSize maximum number of entries in in-memory cache
+ * @param maxCacheSize maximum number of entries in the in-memory cache
  *
  * @see eu.europa.esig.dss.service.http.commons.FileCacheDataLoader
  */
@@ -66,7 +67,6 @@ public class ConcurrentCacheDataLoader(
     private val fileCacheExpiration: Duration,
     cacheDirectory: Path? = null,
     cacheDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val clock: Clock = Clock.System,
     httpCacheTtl: Duration = 5.seconds,
     maxCacheSize: Int = 100,
 ) : DataLoader, DSSCacheFileLoader, AutoCloseable {
@@ -85,7 +85,7 @@ public class ConcurrentCacheDataLoader(
 
     private val httpCache = AsyncCache<String, ByteArray>(
         cacheDispatcher = cacheDispatcher,
-        clock = clock,
+        clock = Clock.System,
         ttl = httpCacheTtl,
         maxCacheSize = maxCacheSize,
     ) { url ->
@@ -182,12 +182,11 @@ public class ConcurrentCacheDataLoader(
 
     private fun readIfFresh(file: Path): ByteArray? {
         if (!Files.exists(file)) return null
-        if (fileCacheExpiration.isPositive()) {
-            val lastModified = Files.getLastModifiedTime(file).toMillis()
-            val now = clock.now().toEpochMilliseconds()
-            if (now - lastModified >= fileCacheExpiration.inWholeMilliseconds) {
-                return null
-            }
+
+        val lastModified = Files.getLastModifiedTime(file).toMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
+        if (now - lastModified >= fileCacheExpiration.inWholeMilliseconds) {
+            return null
         }
         return Files.readAllBytes(file)
     }
