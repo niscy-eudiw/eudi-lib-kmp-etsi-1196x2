@@ -151,6 +151,107 @@ DssOptions.usingFileCacheDataLoader(
 )
 ```
 
+## High-Concurrency Scenarios
+
+In applications with many concurrent certificate validation requests (e.g., server-side validation, high-throughput wallets), optimizing cache efficiency becomes critical.
+
+### Three-Layer Cache Architecture
+
+When using `ConcurrentCacheDataLoader` with a cached `GetTrustAnchorsFromLoTL`, you get three complementary cache layers:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 1: AsyncCache (GetTrustAnchorsFromLoTL)                  │
+│ - Deduplicates concurrent queries using LOTLSource as key      │
+│ - TTL-based in-memory cache                                    │
+│ - Prevents redundant LOTL/TL lookups for same query            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 2: ConcurrentCacheDataLoader - In-Memory                 │
+│ - Per-URL HTTP response cache                                  │
+│ - Deduplicates concurrent HTTP requests for same URL           │
+│ - Prevents multiple downloads of same LOTL/TL file             │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 3: ConcurrentCacheDataLoader - File System               │
+│ - Persistent cache with configurable expiration                │
+│ - Per-URL mutex prevents concurrent file corruption            │
+│ - Atomic writes ensure cache integrity                         │
+│ - Enables offline validation                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Example: High-Concurrency Setup
+
+```kotlin
+import eu.europa.ec.eudi.etsi1196x2.consultation.cached
+import eu.europa.ec.eudi.etsi1196x2.consultation.dss.ConcurrentCacheDataLoader
+import kotlinx.coroutines.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+
+// 1. Create thread-safe loader with dual-layer caching
+val loader = ConcurrentCacheDataLoader(
+    httpLoader = NativeHTTPDataLoader(),
+    fileCacheExpiration = 24.hours,
+    cacheDirectory = Paths.get("/cache/lotl"),
+)
+
+// 2. Configure DSS with the concurrent-safe loader
+val dssOptions = DssOptions(loader = loader)
+
+// 3. Create GetTrustAnchorsFromLoTL
+val getTrustAnchorsFromLoTL = GetTrustAnchorsFromLoTL(dssOptions)
+
+// 4. Wrap with AsyncCache for additional deduplication
+//    This reduces concurrent LOTLSource queries at the application level
+//    Both loader and cachedGetTrustAnchors are AutoCloseable
+loader.use {
+    getTrustAnchorsFromLoTL.cached(
+        ttl = 10.minutes,
+        expectedQueries = 100,  // Expected concurrent queries
+    ).use { cachedGetTrustAnchors ->
+        // 5. Handle concurrent validation requests efficiently
+        runBlocking {
+            (1..100).map { i ->
+                async {
+                    val trustAnchors = cachedGetTrustAnchors(loTLSource)
+                    // Validate certificate chain...
+                }
+            }.awaitAll()
+        }
+    }
+}
+```
+
+### Benefits
+
+With this three-layer approach:
+
+- **Layer 1** deduplicates concurrent queries to unique LOTLSource lookups
+- **Layer 2** deduplicates concurrent HTTP requests to minimal remote fetches
+- **Layer 3** serves cached files after initial download, enabling offline validation
+
+> [!NOTE]
+>
+> `ConcurrentCacheDataLoader` uses the system clock for file cache expiration to ensure consistency with filesystem timestamps.
+>
+> `AsyncCache` can use a custom clock for testing purposes.
+
+### When to Use
+
+**Recommended for:**
+- ✅ Server-side validation with concurrent user requests
+- ✅ High-throughput wallets processing multiple attestations
+- ✅ Applications with parallel validation pipelines
+
+**Not required for:**
+- ✅ Single-threaded or low-concurrency applications
+- ✅ Simple client-side validation with sequential requests
+- ✅ Testing environments with controlled timing
+
 ## Platform Support
 
 The library targets JVM and Android.
