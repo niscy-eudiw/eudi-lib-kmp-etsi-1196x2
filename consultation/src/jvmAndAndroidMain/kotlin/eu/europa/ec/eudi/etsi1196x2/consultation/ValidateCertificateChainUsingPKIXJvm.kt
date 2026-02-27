@@ -121,9 +121,11 @@ public class ValidateCertificateChainUsingPKIXJvm(
 
         /**
          * Default customization for PKIX parameters.
-         * Does nothing.
+         * Enables revocation checking by default as per RFC 5280 Section 6.3.
          */
-        public val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = { }
+        public val DEFAULT_CUSTOMIZATION: PKIXParameters.() -> Unit = {
+            isRevocationEnabled = true
+        }
 
         /**
          * Default coroutine dispatcher for validating certificate chains.

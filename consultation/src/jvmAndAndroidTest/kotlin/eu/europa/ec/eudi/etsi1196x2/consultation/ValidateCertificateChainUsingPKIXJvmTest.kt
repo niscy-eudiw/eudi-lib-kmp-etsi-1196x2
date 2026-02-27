@@ -173,6 +173,7 @@ private suspend fun validate(
     trust: List<X509Certificate>,
     provider: Provider? = BouncyCastleProvider(),
 ): CertificationChainValidation<TrustAnchor> {
+    // Tests disable revocation checking as they don't have access to CRL/OCSP
     val customization = JvmSecurity.withRevocationEnabled(false)
     val validateCertificateChain =
         provider
