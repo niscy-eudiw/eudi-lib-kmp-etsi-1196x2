@@ -22,7 +22,6 @@ import eu.europa.esig.dss.spi.client.http.DSSCacheFileLoader
 import eu.europa.esig.dss.spi.client.http.DataLoader
 import eu.europa.esig.dss.spi.exception.DSSDataLoaderMultipleException
 import eu.europa.esig.dss.spi.exception.DSSExternalResourceException
-import eu.europa.esig.dss.tsl.sync.SynchronizationStrategy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -34,46 +33,35 @@ import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-public fun DssOptions.Companion.usingCustomLoader(
-    fileCacheExpiration: Duration = DefaultFileCacheExpiration,
-    cacheDirectory: Path? = null,
-    cleanMemory: Boolean = DEFAULT_CLEAN_MEMORY,
-    cleanFileSystem: Boolean = DEFAULT_CLEAN_FILE_SYSTEM,
-    httpLoader: DataLoader = DefaultHttpLoader,
-    httpCacheTtl: Duration = 5.seconds,
-    maxCacheSize: Int = 100,
-    cacheDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    clock: Clock = Clock.System,
-    synchronizationStrategy: SynchronizationStrategy = DefaultSynchronizationStrategy,
-    executorService: ExecutorService? = null,
-    validateJobDispatcher: CoroutineDispatcher = Dispatchers.IO,
-): DssOptions {
-    val loader = CustomLoader(
-        httpLoader = httpLoader,
-        fileCacheExpiration = fileCacheExpiration,
-        cacheDirectory = cacheDirectory,
-        cacheDispatcher = cacheDispatcher,
-        clock = clock,
-        httpCacheTtl = httpCacheTtl,
-        maxCacheSize = maxCacheSize,
-    )
-    return DssOptions(
-        loader,
-        cleanMemory,
-        cleanFileSystem,
-        synchronizationStrategy,
-        executorService,
-        validateJobDispatcher,
-    )
-}
-
-public class CustomLoader(
+/**
+ * A thread-safe [DataLoader] with dual-layer caching for concurrent LOTL/TL fetching.
+ *
+ * Provides:
+ * - **In-memory cache** with TTL to deduplicate concurrent requests for the same URL
+ * - **File system cache** with expiration for offline capability
+ * - **Per-URL mutex** to serialize file writes and prevent cache corruption
+ * - **Atomic file writes** (write to temp, then atomic move)
+ *
+ * Use this loader when multiple coroutines may concurrently fetch trust lists,
+ * especially in high-concurrency scenarios where DSS's [FileCacheDataLoader] may
+ * experience race conditions.
+ *
+ * @param httpLoader the underlying HTTP loader for fetching remote resources
+ * @param fileCacheExpiration duration after which cached files are considered stale
+ * @param cacheDirectory directory for file cache; defaults to system temp directory
+ * @param cacheDispatcher coroutine dispatcher for cache operations
+ * @param clock time source for cache expiration
+ * @param httpCacheTtl TTL for in-memory HTTP response cache
+ * @param maxCacheSize maximum number of entries in in-memory cache
+ *
+ * @see eu.europa.esig.dss.service.http.commons.FileCacheDataLoader
+ */
+public class ConcurrentCacheDataLoader(
     private val httpLoader: DataLoader,
     private val fileCacheExpiration: Duration,
     cacheDirectory: Path? = null,
