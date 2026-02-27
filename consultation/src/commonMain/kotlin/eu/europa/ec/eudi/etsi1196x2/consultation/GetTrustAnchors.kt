@@ -166,8 +166,8 @@ public class GetTrustAnchorsCachedSource<in QUERY : Any, out TRUST_ANCHOR : Any>
 ) : GetTrustAnchors<QUERY, TRUST_ANCHOR>, AutoCloseable {
 
     private val cached: AsyncCache<QUERY, NonEmptyList<TRUST_ANCHOR>?> =
-        AsyncCache(cacheDispatcher, clock, ttl, expectedQueries) { trustSource ->
-            delegate(trustSource)
+        AsyncCache(cacheDispatcher, clock, ttl, expectedQueries) { query ->
+            delegate(query)
         }
 
     override suspend fun invoke(query: QUERY): NonEmptyList<TRUST_ANCHOR>? = cached(query)

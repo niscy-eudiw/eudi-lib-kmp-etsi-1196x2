@@ -15,28 +15,26 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 
-import eu.europa.ec.eudi.etsi1196x2.consultation.CertificationChainValidation
-import eu.europa.ec.eudi.etsi1196x2.consultation.IsChainTrustedForContext
-import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIXJvm
-import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
-import eu.europa.ec.eudi.etsi1196x2.consultation.dss.EUDIRefDevEnv.httpLoader
+import eu.europa.ec.eudi.etsi1196x2.consultation.*
+import eu.europa.esig.dss.spi.client.http.DataLoader
 import eu.europa.esig.dss.spi.client.http.NativeHTTPDataLoader
 import eu.europa.esig.dss.tsl.function.GrantedOrRecognizedAtNationalLevelTrustAnchorPeriodPredicate
 import eu.europa.esig.dss.tsl.source.LOTLSource
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import java.nio.file.Files.createTempDirectory
 import java.security.cert.CertificateFactory
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Predicate
 import kotlin.io.encoding.Base64
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertIs
-import kotlin.test.assertNull
+import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
@@ -61,30 +59,38 @@ object EUDIRefDevEnv {
         return lotlSource
     }
 
-    val httpLoader = ObservableHttpLoader(NativeHTTPDataLoader())
-
-    fun isChainTrustedForContext() =
-        IsChainTrustedForContext.usingLoTL(
-            dssOptions = DssOptions.usingFileCacheDataLoader(
-                fileCacheExpiration = 24.hours,
-                cacheDirectory = createTempDirectory("lotl-cache"),
-                httpLoader = httpLoader,
-            ),
-            queryPerVerificationContext = buildMap {
-                put(VerificationContext.PID, lotlSource(PID_SVC_TYPE))
-                put(VerificationContext.PubEAA, lotlSource(PUB_EAA_SVC_TYPE))
-            },
-            ttl = 10.seconds,
-            validateCertificateChain = ValidateCertificateChainUsingPKIXJvm(customization = {
-                this.isRevocationEnabled = false
-            }),
+    fun dssOptions(httpLoader: DataLoader) =
+        DssOptions.usingFileCacheDataLoader(
+            fileCacheExpiration = 24.hours,
+            cacheDirectory = createTempDirectory("lotl-cache"),
+            httpLoader = httpLoader,
         )
+
+    val supportedLists = SupportedLists(
+        pidProviders = lotlSource(PID_SVC_TYPE),
+        pubEaaProviders = lotlSource(PUB_EAA_SVC_TYPE),
+    )
+
+    val pkixChainValidator = ValidateCertificateChainUsingPKIXJvm(customization = { isRevocationEnabled = false })
+}
+
+private fun SupportedLists<LOTLSource>.asMap(): Map<VerificationContext, LOTLSource> = buildMap {
+    pidProviders?.let { put(VerificationContext.PID, it) }
+    pubEaaProviders?.let { put(VerificationContext.PubEAA, it) }
+    qeaProviders?.let { put(VerificationContext.QEAA, it) }
 }
 
 class IsChainTrustedUsingLoTLTest {
 
-    val isX5CTrusted =
-        EUDIRefDevEnv.isChainTrustedForContext().contraMap(::certsFromX5C)
+    val isX5CTrusted = run {
+        val httpLoader = NativeHTTPDataLoader()
+        val dssOptions = EUDIRefDevEnv.dssOptions(httpLoader)
+        val pkixValidator = EUDIRefDevEnv.pkixChainValidator
+        val getTrustAnchors = GetTrustAnchorsFromLoTL(dssOptions)
+        getTrustAnchors
+            .validator(EUDIRefDevEnv.supportedLists.asMap(), pkixValidator)
+            .contraMap(::certsFromX5C)
+    }
 
     @Test
     fun verifyThatPidX5CIsTrustedForPIDContext() = runTest {
@@ -108,27 +114,162 @@ class IsChainTrustedUsingLoTLTest {
     }
 }
 
+/**
+ * The test stresses the cached version of GetTrustAnchorsFromLoTL
+ *
+ * Conditions:
+ * - The first-level cache is empty (to force lookup to DSS File Cache)
+ * - The second-level cache is empty (to force http loading)
+ * - 400 concurrent verifications are requested
+ *
+ * Implementation to handle this use-case:
+ * - The DSS's Http loader is wrapped to a ConstraintHttpLoader. This secures that
+ *   a) There won't be two concurrent calls to the same URL (minimizes the http calls)
+ *   b) The DSS File cache is not corrupted
+ *
+ * The first-level cache should also deduplicate the 400 concurrent calls into just two requests.
+ * Yet since DSS LOTLSource class doesn't implement equals() and hashCode() methods,
+ * deduplication doesn't work
+ *
+ * Even without the first-level cache deduplication, the test should complete without
+ * - DSS File Cache reporting corrupted files and
+ * - Keeping the Http Calls to the absolute minimum (This is 1 LOTL + 16 LIST = 17 HTTP calls)
+ */
 class IsChainTrustedUsingLoTLParallelTest {
 
-    val isX5CTrusted =
-        EUDIRefDevEnv.isChainTrustedForContext().contraMap(::certsFromX5C)
+    private val clock = Clock.System
+    private val pkixValidator = EUDIRefDevEnv.pkixChainValidator
+    private val iterations = 200
+
+    @Ignore("This test will fail. It just demonstrates the problem of FileCacheDataLoader")
+    @Test
+    fun stressTestDssFileCacheLoaderCommonCase() = runTest {
+        val expectedHttpCalls = 17 * 2
+        val httpLoader = ObservableHttpLoader(NativeHTTPDataLoader())
+        val dssOptions = DssOptions.usingFileCacheDataLoader(
+            httpLoader = httpLoader,
+            fileCacheExpiration = 24.hours,
+            cacheDirectory = createTempDirectory("lotl-cache-dss"),
+        )
+        GetTrustAnchorsFromLoTL(dssOptions)
+            .cached(clock = clock, ttl = 10.seconds, expectedQueries = iterations)
+            .use { getTrustAnchors ->
+                doTest(httpLoader, getTrustAnchors, expectedHttpCalls)
+            }
+    }
 
     @Test
-    fun checkInParallel() = runTest {
-        resetHttpLoaderAnd {
+    fun stressTestDssFileCacheLoaderCommonConstraint() = runTest {
+        val expectedHttpCalls = 17
+        ConstraintHttpLoader(
+            cacheDispatcher = Dispatchers.IO.limitedParallelism(1),
+            clock = clock,
+            maxCacheSize = 20,
+            ttl = 5.seconds,
+            proxied = NativeHTTPDataLoader(),
+        ).use { httpLoader ->
+            val dssOptions = DssOptions.usingFileCacheDataLoader(
+                httpLoader = httpLoader,
+                fileCacheExpiration = 24.hours,
+                cacheDirectory = createTempDirectory("lotl-cache-dss-constraint"),
+            )
+            GetTrustAnchorsFromLoTL(dssOptions)
+                .cached(clock = clock, ttl = 10.seconds, expectedQueries = iterations)
+                .use { getTrustAnchors ->
+                    doTest(httpLoader, getTrustAnchors, expectedHttpCalls)
+                }
+        }
+    }
+
+    @Test
+    fun stressTestCustomLoader() = runTest {
+        val expectedHttpCalls = 17
+        val httpLoader = ObservableHttpLoader(NativeHTTPDataLoader())
+        val dssOptions = DssOptions.usingCustomLoader(
+            httpLoader = httpLoader,
+            fileCacheExpiration = 24.hours,
+            cacheDirectory = createTempDirectory("lotl-cache-custom"),
+        )
+        GetTrustAnchorsFromLoTL(dssOptions)
+            .cached(clock = clock, ttl = 10.seconds, expectedQueries = iterations)
+            .use { getTrustAnchors ->
+                doTest(httpLoader, getTrustAnchors, expectedHttpCalls)
+            }
+    }
+
+    private suspend fun CoroutineScope.doTest(
+        httpGetCounter: GetCounter,
+        getTrustAnchors: GetTrustAnchorsCachedSource<LOTLSource, TrustAnchor>,
+        expectedHttpCalls: Int,
+    ) {
+        httpGetCounter.resetCallCount()
+        val isX5CTrusted =
+            getTrustAnchors
+                .validator(EUDIRefDevEnv.supportedLists.asMap(), pkixValidator)
+                .contraMap(::certsFromX5C)
+        val (verifications, consoleOutput) = captureConsole {
             buildList {
-                repeat(200) {
+                repeat(iterations) {
                     add(async { isX5CTrusted(pidX5c, VerificationContext.PID) })
                     add(async { isX5CTrusted(pidX5c, VerificationContext.PubEAA) })
                 }
             }.awaitAll()
         }
+
+        val expectedVerifications = iterations * 2 // two calls per iteration
+        val expectedErrors = 0
+        val httpCalls = httpGetCounter.callCount
+        val fatalPrintedToConsole = consoleOutput.containsError(listOf("Fatal", "error"))
+
+        println("Total verifications: ${verifications.size}/$expectedVerifications")
+        println("Total http calls: $httpCalls/$expectedHttpCalls")
+        println("Fatal errors: ${fatalPrintedToConsole.size}")
+        println("Logs:")
+        consoleOutput.allLines.forEach { println(it) }
+
+        assertEquals(expectedHttpCalls, httpCalls, "Unexpected number of http calls")
+        assertEquals(expectedVerifications, verifications.size, "Unexpected number of verifications")
+        assertEquals(
+            expectedErrors,
+            fatalPrintedToConsole.size,
+            fatalPrintedToConsole.joinToString("\n"),
+        )
+
+        assertEquals(expectedHttpCalls, httpCalls)
     }
 
-    private suspend fun resetHttpLoaderAnd(doit: suspend () -> Unit): Int {
-        httpLoader.reset()
-        doit()
-        return httpLoader.callCount.also { println("HTTP call count: $it") }
+    private class ConstraintHttpLoader(
+        cacheDispatcher: CoroutineDispatcher,
+        clock: Clock,
+        ttl: Duration,
+        maxCacheSize: Int,
+        proxied: DataLoader,
+    ) : DataLoader by proxied, AutoCloseable, GetCounter {
+        private val _callCount = AtomicInteger(0)
+        override val callCount: Int get() = _callCount.get()
+        private val cache = AsyncCache<String, ByteArray>(
+            cacheDispatcher = cacheDispatcher,
+            clock = clock,
+            ttl = ttl,
+            maxCacheSize = maxCacheSize,
+        ) { url ->
+            withContext(CoroutineName("Downloading $url")) {
+                println("Downloading $url")
+                _callCount.incrementAndGet()
+                proxied.get(url)
+            }
+        }
+
+        override fun resetCallCount(): Int = _callCount.getAndUpdate { 0 }
+
+        override fun get(url: String): ByteArray =
+            runBlocking {
+                cache.invoke(url)
+            }
+
+        override fun close() {
+            cache.close()
+        }
     }
 }
 
@@ -140,5 +281,43 @@ fun certsFromX5C(x5c: List<String>): List<X509Certificate> {
     return x5c.map {
         val decoded = Base64.decode(it)
         factory.generateCertificate(ByteArrayInputStream(decoded)) as X509Certificate
+    }
+}
+
+private suspend fun <T> captureConsole(block: suspend () -> T): Pair<T, ConsoleOutput> {
+    val originalOut = System.out
+    val originalErr = System.err
+    return ByteArrayOutputStream().use { outStream ->
+        ByteArrayOutputStream().use { errStream ->
+            System.setOut(PrintStream(outStream))
+            System.setErr(PrintStream(errStream))
+            val result = block()
+            val console = ConsoleOutput(
+                out = outStream.toString(),
+                err = errStream.toString(),
+            )
+            result to console
+        }
+    }.also { _ ->
+        System.setOut(originalOut)
+        System.setErr(originalErr)
+    }
+}
+
+private data class ConsoleOutput(
+    val out: String,
+    val err: String,
+) {
+    val allLines: List<String>
+        get() = (out + err)
+            .split("\n")
+            .filter { it.isNotBlank() }
+
+    fun containsError(keywords: List<String>): List<String> {
+        return allLines.filter { line ->
+            keywords.any { keyword ->
+                line.contains(keyword, ignoreCase = true)
+            }
+        }
     }
 }
