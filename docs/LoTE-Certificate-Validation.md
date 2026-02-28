@@ -1,8 +1,14 @@
 # Certificate Chain Validation Using EU Provider Lists (LoTE) for EUDI Wallet Attestations
 
-**Document Version:** 4.2  
-**Date:** 2026-02-28  
+**Document Version:** 4.3
+**Date:** 2026-02-28
 **Purpose:** Analysis of ETSI specifications for certificate chain validation against EU Provider Lists (LoTE) serving as trust anchor sources for PID, Wallet, WRPAC, and WRPRC providers
+
+**Version 4.3 Changes:**
+- Clarified WRPRC LoTE certificate type: CA certificate (not end-entity signing cert)
+- Added detailed analysis comparing Table G.3 vs Table F.3 wording
+- Updated validation method: PKIX (x5c chain → LoTE CA) + JWT signature verification
+- Added footnote in Executive Summary explaining WRPRC LoTE type determination
 
 ---
 
@@ -17,12 +23,15 @@ This document analyzes ETSI specifications to understand how certificates found 
 | **PID Providers** | Annex D | End-entity ONLY | PID signing certificate | **Direct Trust** |
 | **Wallet Providers** | Annex E | End-entity ONLY | Wallet signing certificate | **Direct Trust** |
 | **WRPAC Providers** | Annex F | CA (WRPAC Provider) | WRPAC X.509 certificate | **PKIX** |
-| **WRPRC Providers** | Annex G | Signing Cert (WRPRC Provider) | WRPRC JWT `x5c` chain | **PKIX** |
+| **WRPRC Providers** | Annex G | CA (WRPRC Provider)¹ | WRPRC JWT `x5c` chain | **PKIX** |
+
+**Footnotes:**
+¹ **WRPRC LoTE Certificate Type:** Table G.3 wording ("verify the signature... on the registration certificate it provides") is identical to Table F.3 (WRPAC), indicating the LoTE contains a **CA certificate** (WRPRC Provider), not an end-entity signing certificate. The WRPRC JWT `x5c` header contains "the whole certificate chain" (ETSI TS 119 475 Table 5), which builds via PKIX to the LoTE CA. See Section 4.2.2 for detailed analysis.
 
 **Critical Distinction:**
 - **PID/Wallet Providers**: Sign data directly → End-entity certificate in LoTE → Direct Trust validation (certificate match)
 - **WRPAC Providers**: Issue X.509 certificates to Relying Parties → CA certificate in LoTE → PKIX validation (chain from WRPAC to LoTE CA)
-- **WRPRC Providers**: Sign JWT attestations → Signing certificate in LoTE → PKIX validation (chain from WRPRC `x5c` to LoTE)
+- **WRPRC Providers**: Sign JWT attestations → CA certificate in LoTE → PKIX validation (chain from WRPRC `x5c` to LoTE CA), then JWT signature verification
 
 **Note on WRPRC:** The WRPRC itself is a JWT attestation (NOT an X.509 certificate). The certificate chain validation (PKIX) verifies the `x5c` certificates in the WRPRC JWT header against the LoTE. JWT signature verification is a separate step that uses the validated certificate.
 
@@ -33,12 +42,12 @@ This document analyzes ETSI specifications to understand how certificates found 
 - **PKIX validation** = Builds chain from WRPAC (x5c) to LoTE trust anchor
 
 **WRPRC Attestation Architecture:**
-- **WRPRC Provider** = Signs WRPRC JWT attestations
+- **WRPRC Provider** = Signs WRPRC JWT attestations (acts as CA)
 - **WRPRC** = JWT attestation declaring WRP entitlements and intended use
-- **WRPRC `x5c`** = Certificate chain to verify WRPRC signature
-- **LoTE** = Contains WRPRC Provider's signing certificate (trust anchor)
-- **Certificate Chain Validation** = PKIX (chain from WRPRC `x5c` to LoTE)
-- **JWT Signature Verification** = Uses validated certificate from `x5c` (separate step)
+- **WRPRC `x5c`** = Certificate chain to verify WRPRC signature (end-entity → intermediate → LoTE CA)
+- **LoTE** = Contains WRPRC Provider's CA certificate (trust anchor)
+- **Certificate Chain Validation** = PKIX (chain from WRPRC `x5c` end-entity to LoTE CA)
+- **JWT Signature Verification** = Uses validated end-entity certificate from `x5c` (separate step)
 
 **Dual-Layer Trust Framework:**
 - **WRPAC** = Authentication ("Who are you?") - X.509 certificate
@@ -50,7 +59,7 @@ This document analyzes ETSI specifications to understand how certificates found 
 - `x5c` in JWT header MUST NOT include trust anchor (per HAIP v1)
 - For PID/Wallet: `x5c` contains end-entity, LoTE contains same end-entity → Direct match
 - For WRPAC: `x5c` contains end-entity, LoTE contains CA → PKIX path validation required
-- For WRPRC: `x5c` in WRPRC JWT header contains cert chain, LoTE contains signing cert → PKIX path validation required (then JWT signature verification)
+- For WRPRC: `x5c` in WRPRC JWT header contains cert chain (end-entity → CA), LoTE contains CA → PKIX path validation required (then JWT signature verification)
 
 ---
 
@@ -765,20 +774,84 @@ Per ETSI TS 119 475, Table 5:
 
 > "The ServiceDigitalIdentity component shall contain one or more X.509 certificates that can be used to verify the signature or seal created by the provider of wallet-relying party registration certificates **on the registration certificate it provides to wallet-relying parties**..."
 
-**Critical Finding 4.2.2:** The LoTE contains the **WRPRC Provider's signing certificate(s)** (X.509), which are used to verify the **signatures on WRPRC JWTs**.
+**Critical Finding 4.2.2:** The LoTE contains the **WRPRC Provider's CA certificate(s)** (X.509), NOT an end-entity signing certificate.
+
+**Analysis: Table G.3 vs Table F.3 Wording**
+
+| Aspect | Table F.3 (WRPAC) | Table G.3 (WRPRC) |
+|--------|-------------------|-------------------|
+| **Wording** | "verify the signature... on the access certificate it provides" | "verify the signature... on the registration certificate it provides" |
+| **Pattern** | Identical structure | Identical structure |
+| **Interpretation** | LoTE contains CA cert (WRPAC Provider) | LoTE contains CA cert (WRPRC Provider) |
+
+**Key Evidence for CA Certificate in LoTE:**
+
+1. **Identical Wording Pattern:** Table G.3 uses the same "verify the signature... on the [certificate type] it provides" pattern as Table F.3 (WRPAC), which explicitly contains a CA certificate.
+
+2. **"Whole Certificate Chain" in x5c:** ETSI TS 119 475 Table 5 states the `x5c` header field "contains the **whole** certificate chain to verify the JWT." The word "whole" implies multiple certificates (end-entity → intermediate → CA), not just a single end-entity certificate.
+
+3. **PKIX Validation Required:** If the LoTE contained only the end-entity signing certificate (Direct Trust), the `x5c` would only need to contain that single certificate. The requirement for "the whole certificate chain" indicates PKIX path validation is expected.
+
+4. **WRPRC Provider as CA:** The WRPRC Provider signs WRPRC JWT attestations. If the Provider uses an intermediate CA internally (common practice), the LoTE would contain the CA certificate, and the `x5c` would contain the chain from the end-entity signing certificate to that CA.
+
+**Conclusion:** The WRPRC Providers LoTE contains a **CA certificate** (WRPRC Provider), and validation requires **PKIX** (building the chain from the `x5c` end-entity certificate to the LoTE CA). This is the same pattern as WRPAC Providers (Annex F).
+
+**Certificate Chain Structure for WRPRC:**
+
+```
+┌─────────────────────────────────┐
+│  WRPRC Provider CA Certificate  │
+│  (PUBLISHED IN LoTE)            │
+│  - basicConstraints: cA=TRUE    │
+│  - Trust Anchor                 │
+└─────────────────────────────────┘
+         ▲
+         │ Verified by PKIX
+         │
+┌─────────────────────────────────┐
+│  Intermediate CA (optional)     │
+│  - basicConstraints: cA=TRUE    │
+│  - Included in x5c              │
+└─────────────────────────────────┘
+         ▲
+         │ Issues
+         │
+┌─────────────────────────────────┐
+│  WRPRC Signing Certificate      │
+│  (End-Entity)                   │
+│  - basicConstraints: cA=FALSE   │
+│  - Key Usage: digitalSignature  │
+│  - Included in x5c (first cert) │
+└─────────────────────────────────┘
+         │
+         │ Signs
+         ▼
+┌─────────────────────────────────┐
+│  WRPRC JWT                      │
+│  - Header: { x5c: [...] }       │
+│  - Payload: { intended_use,     │
+│               entitlements }    │
+│  - Signature                    │
+└─────────────────────────────────┘
+
+LoTE ServiceDigitalIdentity contains: WRPRC Provider CA certificate
+Validation Method: PKIX (chain from x5c end-entity to LoTE CA), then JWT signature verification
+```
 
 #### 4.2.3 Comparison: WRPAC vs WRPRC LoTE
 
 | Aspect | WRPAC Providers (Annex F) | WRPRC Providers (Annex G) |
 |--------|--------------------------|---------------------------|
-| **What LoTE contains** | WRPAC Provider CA certificate | WRPRC Provider signing certificate |
-| **What is verified** | WRPAC X.509 certificate | WRPRC JWT signature |
-| **Verification target** | End-entity certificate (WRPAC) | JWT attestation (WRPRC) |
-| **Validation method** | PKIX chain validation | JWT signature verification |
+| **What LoTE contains** | WRPAC Provider CA certificate | WRPRC Provider CA certificate |
+| **What is verified** | WRPAC X.509 certificate | WRPRC JWT `x5c` chain |
+| **Verification target** | End-entity certificate (WRPAC) | Certificate chain in JWT header |
+| **Validation method** | PKIX chain validation | PKIX chain validation + JWT signature |
+| **LoTE cert type** | CA certificate | CA certificate |
+| **x5c content** | End-entity cert (WRPAC) | End-entity → Intermediate → CA chain |
 
-**Finding 4.2.3:** Both LoTEs contain X.509 CA/signing certificates, but they verify different objects:
-- **WRPAC LoTE** → Validates X.509 certificate chain (PKIX)
-- **WRPRC LoTE** → Validates JWT signature (JWS)
+**Finding 4.2.3:** Both LoTEs contain **CA certificates** and use **PKIX validation**:
+- **WRPAC LoTE** → Validates X.509 certificate chain (WRPAC end-entity → LoTE CA)
+- **WRPRC LoTE** → Validates JWT `x5c` chain (WRPRC signing cert → LoTE CA), then verifies JWT signature
 
 ---
 
@@ -839,14 +912,24 @@ Per ETSI TS 119 475, Clause 6.2.2.2:
 ```
 ┌─────────────────────────────────┐
 │  EU WRPRC Providers LoTE        │
-│  (WRPRC Provider Signing Cert)  │
-│  - X.509 certificate            │
+│  (WRPRC Provider CA Certificate)│
+│  - X.509 CA certificate         │
+│  - basicConstraints: cA=TRUE    │
 │  - Trust Anchor                 │
 │  ★ PUBLISHED IN LoTE ★          │
 └─────────────────────────────────┘
          ▲
-         │ Verify signature against
+         │ PKIX chain validation
          │
+┌─────────────────────────────────┐
+│  WRPRC JWT x5c Chain            │
+│  - [0]: End-entity signing cert │
+│  - [1]: Intermediate CA (opt)   │
+│  - basicConstraints: cA=TRUE    │
+└─────────────────────────────────┘
+         │
+         │ Signs
+         ▼
 ┌─────────────────────────────────┐
 │  WRPRC JWT                      │
 │  - Header: { typ: rc-wrp+jwt,   │
@@ -867,8 +950,8 @@ Per ETSI TS 119 475, Clause 6.2.2.2:
 │  OpenID4VP: verifier_info       │
 └─────────────────────────────────┘
 
-LoTE ServiceDigitalIdentity contains: WRPRC Provider signing certificate (X.509)
-Validation Method: JWT signature verification (JWS per RFC 7515)
+LoTE ServiceDigitalIdentity contains: WRPRC Provider CA certificate (X.509)
+Validation Method: PKIX (x5c chain → LoTE CA), then JWT signature verification (JWS per RFC 7515)
 ```
 
 #### 4.4.2 Validation Steps
@@ -879,23 +962,37 @@ WRPRC JWT validation requires two phases:
 1. Parse WRPRC JWT header
 2. Verify `typ` is `rc-wrp+jwt`
 3. Extract `x5c` certificate chain from header
-4. Load trust anchors from EU WRPRC Providers LoTE
-5. Validate certificate chain from `x5c` to LoTE trust anchor (PKIX)
+4. Load trust anchors from EU WRPRC Providers LoTE (CA certificates)
+5. Build certification path from `x5c` end-entity certificate to LoTE CA
+6. Validate chain using PKIX (RFC 5280 Section 6.3):
+   - Verify signatures along the chain
+   - Verify validity periods
+   - Verify basicConstraints (cA=TRUE for intermediate CA)
+   - Verify keyUsage (keyCertSign for CA, digitalSignature for end-entity)
+   - Check revocation status (CRL/OCSP)
 
 **Phase 2: JWT Signature Verification**
-6. Extract validated signing certificate from `x5c`
-7. Verify JWT signature using the certificate's public key
-8. Parse and validate WRPRC payload claims
+7. Extract validated end-entity signing certificate from `x5c`
+8. Verify JWT signature using the certificate's public key (RFC 7515)
+9. Parse and validate WRPRC payload claims:
+   - `intended_use`: Declared purpose of WRP
+   - `entitlements`: Data access permissions
+   - `data_policies`: Data handling commitments
 
 #### 4.4.3 Why This is Different from WRPAC
 
 | Aspect | WRPAC Validation | WRPRC Validation |
 |--------|-----------------|------------------|
-| **What is validated** | X.509 certificate | JWT attestation |
-| **LoTE validates** | Certificate chain (PKIX) | JWT signature (JWS) |
+| **What is validated** | X.509 certificate (WRPAC) | JWT attestation (WRPRC) |
+| **LoTE contains** | CA certificate | CA certificate |
+| **LoTE validates** | Certificate chain (PKIX) | Certificate chain (PKIX) + JWT signature |
 | **x5c location** | In JWT signing Credential Issuer Metadata | In WRPRC JWT header |
-| **Trust relationship** | Direct (certificate → LoTE CA) | Indirect (JWT → signing cert → LoTE) |
+| **x5c content** | End-entity cert (WRPAC) | End-entity → Intermediate → CA chain |
+| **Trust relationship** | Direct (WRPAC → LoTE CA) | Indirect (WRPRC signing cert → LoTE CA) |
+| **Validation phases** | Single (PKIX) | Dual (PKIX + JWS) |
 | **Outcome** | "WRP is authenticated" | "WRP is authorized for X" |
+
+**Finding 4.4.3:** Both WRPAC and WRPRC use **PKIX certificate chain validation** against LoTE CA certificates. The key difference is that WRPRC adds a **second phase** (JWT signature verification) because the WRPRC itself is a JWT attestation, not an X.509 certificate.
 
 ---
 
@@ -906,10 +1003,10 @@ WRPRC JWT validation requires two phases:
 | WRPRC format is JWT/CWT | ETSI TS 119 475 | 5.2.1 | MUST |
 | WRPRC signed by Provider | ETSI TS 119 475 | 5.2.1 | MUST |
 | WRPRC typ = rc-wrp+jwt | ETSI TS 119 475 | Table 5 | MUST |
-| WRPRC contains x5c | ETSI TS 119 475 | Table 5 | MUST |
-| LoTE contains Provider signing cert | ETSI TS 119 602 | Annex G | MUST |
+| WRPRC contains x5c (whole chain) | ETSI TS 119 475 | Table 5 | MUST |
+| LoTE contains Provider CA cert | ETSI TS 119 602 | Annex G, Table G.3 | MUST |
 | WRP must have valid WRPAC | ETSI TS 119 475 | 6.2.2.2 | MUST |
-| Validation method | Inferred from above | N/A | **JWT Signature Verification** |
+| Validation method | Inferred from above | N/A | **PKIX + JWT Signature** |
 
 ---
 
@@ -920,8 +1017,8 @@ WRPRC JWT validation requires two phases:
 | **Format** | X.509 end-entity certificate | JWT attestation |
 | **Purpose** | Authentication | Authorization/Entitlements |
 | **Answers** | "Who are you?" | "What can you do?" |
-| **LoTE contains** | WRPAC Provider CA | WRPRC Provider signing cert |
-| **Validation** | PKIX chain validation | JWT signature + claims |
+| **LoTE contains** | WRPAC Provider CA | WRPRC Provider CA |
+| **Validation** | PKIX chain validation | PKIX (x5c) + JWT signature |
 | **Used in** | JWT `x5c` (signing metadata) | `issuer_info` / `verifier_info` |
 | **Prerequisite** | WRP registration | Valid WRPAC |
 | **ETSI TS 119 411-8** | Applies (Access Certificate Policy) | Not applicable |
@@ -932,12 +1029,20 @@ WRPRC JWT validation requires two phases:
 ### 4.7 Open Questions for Further Investigation
 
 1. **ETSI TS 119 472-2/3 Verification:** Confirm exact placement of WRPRC in OpenID4VP Authorization Request (`verifier_info`) and OpenID4VCI Credential Issuer Metadata (`issuer_info`).
+   - **Status:** These specifications are not in the RAG system; requires external verification.
 
 2. **WRPRC Claims Structure:** What specific claims are included in WRPRC JWT payload (entitlements, intended_use, data_policies)?
+   - **Status:** ETSI TS 119 475 defines the format but not the exact claim structure; may be implementation-specific.
 
 3. **WRPRC Revocation:** How are revoked WRPRCs handled? Is there a status list mechanism?
+   - **Status:** Not specified in ETSI TS 119 475; may use JWT `exp` claim or external revocation list.
 
 4. **Multiple WRPRCs:** Can a WRP have multiple WRPRCs for different use cases? How does Wallet select the appropriate one?
+   - **Status:** ETSI TS 119 475 allows multiple WRPRCs; selection mechanism may be implementation-specific.
+
+5. **WRPRC Provider CA Certificate Profile:** What are the specific certificate profile requirements for WRPRC Provider CA certificates in the LoTE?
+   - **Status:** ETSI TS 119 412-6 does not cover WRPRC Providers; may follow ETSI EN 319 412-2/3 or ETSI TS 119 411-8.
+   - **Note:** Section 4.2.2 clarifies that LoTE contains CA certificate (not end-entity), based on Table G.3 wording pattern matching Table F.3 (WRPAC).
 
 ---
 
@@ -977,6 +1082,7 @@ WRPRC JWT validation requires two phases:
 | 4.0 | 2026-02-28 | EUDI Library Team | Added WRPRC Providers analysis (JWT attestation, NOT X.509 - fundamentally different from WRPAC) |
 | 4.1 | 2026-02-28 | EUDI Library Team | Removed pseudo-code examples, replaced with textual descriptions |
 | 4.2 | 2026-02-28 | EUDI Library Team | Clarified WRPRC: Certificate chain validation is PKIX (JWT signature is separate step) |
+| 4.3 | 2026-02-28 | EUDI Library Team | Clarified WRPRC LoTE contains CA certificate (not end-entity); added Table G.3 vs F.3 analysis; updated validation to PKIX + JWT signature |
 
 ---
 
