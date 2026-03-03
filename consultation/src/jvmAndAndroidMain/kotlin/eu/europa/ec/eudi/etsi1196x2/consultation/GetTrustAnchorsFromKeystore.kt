@@ -25,27 +25,27 @@ import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 
 /**
- * Creates an instance of [GetTrustAnchors] using a keystore for trust anchor retrieval.
+ * Creates an instance of [IsChainTrustedForContext] using a keystore for trust anchor retrieval.
  *
  * @param dispatcher the coroutine dispatcher to use for fetching trust anchors from the keystore.
  *        Defaults to [Dispatchers.IO]
  * @param keystore the keystore to use.
  * @param supportedVerificationContexts the set of supported verification contexts.
  * @param regexPerVerificationContext a function that maps a verification context to a regular expression
+ * @param validateCertificateChain the function used to validate a given certificate chain
  *
- * @return an instance of [GetTrustAnchorsForSupportedQueries] that reads trust anchors from the given keystore.
+ * @return an instance of [IsChainTrustedForContext] that reads trust anchors from the given keystore.
  */
-public fun <CTX : Any> GetTrustAnchorsForSupportedQueries.Companion.usingKeyStore(
+public fun <CTX : Any> IsChainTrustedForContext.Companion.usingKeyStore(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
     keystore: KeyStore,
     supportedVerificationContexts: Set<CTX>,
+    validateCertificateChain: ValidateCertificateChain<List<X509Certificate>, TrustAnchor>,
     regexPerVerificationContext: (CTX) -> Regex,
-): GetTrustAnchorsForSupportedQueries<CTX, TrustAnchor> {
+): IsChainTrustedForContext<List<X509Certificate>, CTX, TrustAnchor> {
     val getTrustAnchors = GetTrustAnchorsFromKeystore(dispatcher, keystore)
-    return GetTrustAnchorsForSupportedQueries(
-        supportedVerificationContexts,
-        getTrustAnchors.contraMap(regexPerVerificationContext),
-    )
+    val transformation = supportedVerificationContexts.associateWith { regexPerVerificationContext(it) }
+    return getTrustAnchors.validator(transformation, validateCertificateChain)
 }
 
 public class GetTrustAnchorsFromKeystore(

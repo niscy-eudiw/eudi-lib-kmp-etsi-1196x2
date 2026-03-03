@@ -15,110 +15,50 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.withContext
-
 /**
- * An interface for checking the trustworthiness of a certificate chain
- * in the context of a specific verification context
+ * An [IsChainTrustedForContextF] for a set of supported contexts, that
+ * - share the same [GetTrustAnchors] source
+ * - share the same [ValidateCertificateChain]
  *
- * @param CHAIN type representing a certificate chain
- * @param CTX type representing the verification context
- * @param TRUST_ANCHOR type representing a trust anchor
+ * That's the elementary aggregation unit of [ComposeChainTrust].
  */
-public fun interface IsChainTrustedForContextF<in CHAIN : Any, in CTX : Any, out TRUST_ANCHOR : Any> {
-
-    /**
-     * Check certificate chain is trusted in the context of
-     * specific verification
-     *
-     * @param chain certificate chain to check
-     * @param verificationContext verification context
-     * @return outcome of the check. A null value indicates that the given [verificationContext] has not been configured
-     */
-    public suspend operator fun invoke(
-        chain: CHAIN,
-        verificationContext: CTX,
-    ): CertificationChainValidation<TRUST_ANCHOR>?
-
-    public companion object
-}
-
-/**
- * A default implementation of [IsChainTrustedForContextF]
- *
- * @param validateCertificateChain the certificate chain validation function
- * @param getTrustAnchorsByContext the supported verification contexts and their corresponding trust anchors sources
- *
- * @param CHAIN type representing a certificate chain
- * @param CTX type representing the verification context
- * @param TRUST_ANCHOR type representing a trust anchor
- */
-public class IsChainTrustedForContext<in CHAIN : Any, CTX : Any, out TRUST_ANCHOR : Any>(
-    private val validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
-    private val getTrustAnchorsByContext: GetTrustAnchorsForSupportedQueries<CTX, TRUST_ANCHOR>,
+public class IsChainTrustedForContext<in CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any>(
+    public val supportedContexts: Set<CTX>,
+    getTrustAnchors: GetTrustAnchors<CTX, TRUST_ANCHOR>,
+    public val validateCertificateChain: ValidateCertificateChain<CHAIN, TRUST_ANCHOR>,
 ) : IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> {
 
-    /**
-     * Check certificate chain is trusted in the context of
-     * specific verification
-     *
-     * @param chain certificate chain to check
-     * @param verificationContext verification context
-     * @return outcome of the check. A null value indicates that the given [verificationContext] has not been configured,
-     * or its underlying source didn't return trust anchors
-     */
-    public override suspend operator fun invoke(
-        chain: CHAIN,
-        verificationContext: CTX,
-    ): CertificationChainValidation<TRUST_ANCHOR>? =
-        withContext(CoroutineName(name = "IsChainTrustedForContext - $verificationContext")) {
-            when (val outcome = getTrustAnchorsByContext(verificationContext)) {
-                is GetTrustAnchorsForSupportedQueries.Outcome.Found<TRUST_ANCHOR> -> validateCertificateChain(chain, outcome.trustAnchors)
-                GetTrustAnchorsForSupportedQueries.Outcome.NotFound -> null
-                GetTrustAnchorsForSupportedQueries.Outcome.QueryNotSupported -> null
-            }
+    public val getTrustAnchors: GetTrustAnchors<CTX, TRUST_ANCHOR> =
+        @Suppress("ObjectLiteralToLambda")
+        object : GetTrustAnchors<CTX, TRUST_ANCHOR> by getTrustAnchors {
+            override suspend fun invoke(query: CTX): NonEmptyList<TRUST_ANCHOR>? =
+                when (query) {
+                    in supportedContexts -> getTrustAnchors(query)
+                    else -> null
+                }
         }
 
-    /**
-     * Changes the chain of certificates representation
-     *
-     * ```kotlin
-     * val a : IsChainTrustedForContext<List<Cert>, VerificationContext, TrustAnchor> = ...
-     * fun fromDer(der: ByteArray): Cert =
-     * val b : IsChainTrustedForContext<List<ByteArray>, VerificationContext, TrustAnchor> = a.contraMap{ it.map(fromDer) }
-     * ```
-     *
-     * @param transform transformation function
-     * @return new instance, accepting the new chain representation
-     * @param C1 the new representation of the certificate chain
-     */
-    public fun <C1 : Any> contraMap(transform: (C1) -> CHAIN): IsChainTrustedForContext<C1, CTX, TRUST_ANCHOR> =
-        IsChainTrustedForContext(
-            validateCertificateChain.contraMap(transform),
-            getTrustAnchorsByContext,
-        )
+    override suspend fun invoke(chain: CHAIN, verificationContext: CTX): CertificationChainValidation<TRUST_ANCHOR>? =
+        getTrustAnchors(verificationContext)?.let { validateCertificateChain(chain, it) }
 
-    /**
-     * Creates a new [IsChainTrustedForContext]
-     * that applies the specified recovery logic in addition to the current
-     *
-     * Do not use this method unless you know what you are doing.
-     *
-     * @param recovery  a recovery function that generates alternative validations based on a
-     *     [CTX] and a [CertificationChainValidation.NotTrusted] result.
-     * @return a new instance that applies the specified recovery logic in addition to the current
-     *         validation logic.
-     */
-    @SensitiveApi
-    public fun recoverWith(
-        recovery: (CertificationChainValidation.NotTrusted) -> GetTrustAnchorsForSupportedQueries<CTX, @UnsafeVariance TRUST_ANCHOR>?,
-    ): IsChainTrustedForContextF<CHAIN, CTX, TRUST_ANCHOR> =
-        UnsafeIsChainTrustedForContext(this) { notTrusted ->
-            recovery(notTrusted)?.let {
-                IsChainTrustedForContext(validateCertificateChain, it)
-            }
+    public operator fun contains(ctx: CTX): Boolean = ctx in supportedContexts
+
+    @Throws(IllegalArgumentException::class)
+    public infix operator fun plus(
+        other: IsChainTrustedForContext<@UnsafeVariance CHAIN, CTX, TRUST_ANCHOR>,
+    ): ComposeChainTrust<CHAIN, CTX, TRUST_ANCHOR> =
+        ComposeChainTrust.of(this, other)
+
+    public fun <C1 : Any> contraMap(transformation: (C1) -> CHAIN): IsChainTrustedForContext<C1, CTX, TRUST_ANCHOR> =
+        IsChainTrustedForContext(supportedContexts, getTrustAnchors, validateCertificateChain.contraMap(transformation))
+
+    public companion object {
+
+        internal operator fun <CHAIN : Any, CTX : Any, TRUST_ANCHOR : Any> invoke(
+            other: Triple<Set<CTX>, GetTrustAnchors<CTX, TRUST_ANCHOR>, ValidateCertificateChain<CHAIN, TRUST_ANCHOR>>,
+        ): IsChainTrustedForContext<CHAIN, CTX, TRUST_ANCHOR> {
+            val (supportedCtx, getTrustAnchors, validateCertificateChain) = other
+            return IsChainTrustedForContext(supportedCtx, getTrustAnchors, validateCertificateChain)
         }
-
-    public companion object
+    }
 }

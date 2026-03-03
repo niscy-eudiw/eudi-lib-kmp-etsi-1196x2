@@ -18,14 +18,19 @@ package eu.europa.ec.eudi.etsi1196x2.consultation.dss
 import eu.europa.esig.dss.spi.client.http.DataLoader
 import java.util.concurrent.atomic.AtomicInteger
 
-class ObservableHttpLoader(val proxied: DataLoader) : DataLoader by proxied {
-    private val _callCount = AtomicInteger(0)
-    val callCount: Int get() = _callCount.get()
+interface GetCounter {
+    val callCount: Int
+    fun resetCallCount(): Int
+}
 
-    fun reset(): Int = _callCount.getAndUpdate { 0 }
+class ObservableHttpLoader(val proxied: DataLoader) : DataLoader by proxied, GetCounter {
+    private val _callCount = AtomicInteger(0)
+    override val callCount: Int get() = _callCount.get()
+
+    override fun resetCallCount(): Int = _callCount.getAndUpdate { 0 }
 
     override fun get(url: String?): ByteArray? {
-        println("Downloading $url")
+        println("${Thread.currentThread().name}: Downloading $url")
         _callCount.incrementAndGet()
         return proxied.get(url)
     }
