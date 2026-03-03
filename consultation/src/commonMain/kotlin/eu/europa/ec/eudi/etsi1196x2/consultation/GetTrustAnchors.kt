@@ -47,10 +47,28 @@ public fun interface GetTrustAnchors<in QUERY : Any, out TRUST_ANCHOR : Any> {
     public suspend operator fun invoke(query: QUERY): NonEmptyList<TRUST_ANCHOR>?
 }
 
-public fun <Q : Any, TA : Any, Q1 : Any> GetTrustAnchors<Q, TA>.transform(
+@Deprecated("Use transform instead", replaceWith = ReplaceWith("validator(transformation, validateCertificateChain)"))
+public fun <C : Any, Q : Any, TA : Any, Q1 : Any> GetTrustAnchors<Q, TA>.transform(
+    validateCertificateChain: ValidateCertificateChain<C, TA>,
     transformation: Map<Q1, Q>,
-): GetTrustAnchorsForSupportedQueries<Q1, TA> =
-    GetTrustAnchorsForSupportedQueries.transform(this, transformation)
+): IsChainTrustedForContext<C, Q1, TA> =
+    validator(transformation, validateCertificateChain)
+
+public fun <C : Any, Q : Any, TA : Any> GetTrustAnchors<Q, TA>.validator(
+    supportedQueries: Set<Q>,
+    validateCertificateChain: ValidateCertificateChain<C, TA>,
+): IsChainTrustedForContext<C, Q, TA> =
+    IsChainTrustedForContext(supportedQueries, this, validateCertificateChain)
+
+public fun <C : Any, Q : Any, TA : Any, Q1 : Any> GetTrustAnchors<Q, TA>.validator(
+    transformation: Map<Q1, Q>,
+    validateCertificateChain: ValidateCertificateChain<C, TA>,
+): IsChainTrustedForContext<C, Q1, TA> =
+    IsChainTrustedForContext(
+        transformation.keys,
+        contraMap { checkNotNull(transformation[it]) },
+        validateCertificateChain,
+    )
 
 /**
  * Combines this source with [other] to create a fallback chain.
@@ -148,8 +166,8 @@ public class GetTrustAnchorsCachedSource<in QUERY : Any, out TRUST_ANCHOR : Any>
 ) : GetTrustAnchors<QUERY, TRUST_ANCHOR>, AutoCloseable {
 
     private val cached: AsyncCache<QUERY, NonEmptyList<TRUST_ANCHOR>?> =
-        AsyncCache(cacheDispatcher, clock, ttl, expectedQueries) { trustSource ->
-            delegate(trustSource)
+        AsyncCache(cacheDispatcher, clock, ttl, expectedQueries) { query ->
+            delegate(query)
         }
 
     override suspend fun invoke(query: QUERY): NonEmptyList<TRUST_ANCHOR>? = cached(query)

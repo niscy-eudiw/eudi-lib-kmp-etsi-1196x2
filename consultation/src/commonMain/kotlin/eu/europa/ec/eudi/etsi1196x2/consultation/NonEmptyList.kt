@@ -15,12 +15,43 @@
  */
 package eu.europa.ec.eudi.etsi1196x2.consultation
 
+/**
+ * A value class representing a non-empty list.
+ *
+ * This class provides compile-time guarantees that a list contains at least one element,
+ * eliminating the need for runtime checks in code that requires non-empty collections.
+ *
+ * @param T the type of elements in the list
+ * @property list the underlying list, guaranteed to be non-empty
+ * @throws IllegalArgumentException if the provided list is empty
+ *
+ * @sample
+ * ```kotlin
+ * val nonEmpty = NonEmptyList(listOf(1, 2, 3)) // OK
+ * val empty = NonEmptyList(emptyList<Int>())    // throws IllegalArgumentException
+ * ```
+ */
 @JvmInline
 public value class NonEmptyList<out T>(public val list: List<T>) {
     init {
         require(list.isNotEmpty()) { "Non-empty list expected, but was empty" }
     }
+
     public companion object {
+        /**
+         * Creates a [NonEmptyList] from the given list, or returns null if the list is empty.
+         *
+         * This is a safe constructor that allows handling the empty case explicitly.
+         *
+         * @param list the list to wrap
+         * @return a [NonEmptyList] if the list is not empty, null otherwise
+         *
+         * @sample
+         * ```kotlin
+         * val result = NonEmptyList.nelOrNull(listOf(1, 2)) // NonEmptyList([1, 2])
+         * val empty = NonEmptyList.nelOrNull(emptyList())   // null
+         * ```
+         */
         public fun <T> nelOrNull(list: List<T>): NonEmptyList<T>? =
             if (list.isEmpty()) null else NonEmptyList(list)
     }

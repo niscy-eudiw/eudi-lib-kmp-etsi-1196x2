@@ -38,6 +38,27 @@ public fun interface ValidateCertificateChain<in CHAIN : Any, TRUST_ANCHOR : Any
 }
 
 /**
+ * A functional interface for validating certificate chains using PKIX (X.509 Public Key Infrastructure).
+ *
+ * PKIX validation performs cryptographic verification including:
+ * - Signature verification for each certificate in the chain
+ * - Path building from the leaf certificate to a trust anchor
+ * - Validity period checking
+ * - Certificate revocation checking (if enabled)
+ * - Extension and constraint validation
+ *
+ * Implementations should use standard PKIX algorithms as defined in RFC 5280.
+ *
+ * @param CHAIN the type representing the certificate chain to validate
+ * @param TRUST_ANCHOR the type representing a trust anchor
+ *
+ * @see ValidateCertificateChain
+ * @see java.security.cert.CertPathValidator
+ */
+public fun interface ValidateCertificateChainUsingPKIX<in CHAIN : Any, TRUST_ANCHOR : Any> :
+    ValidateCertificateChain<CHAIN, TRUST_ANCHOR>
+
+/**
  * Represents the outcome of the validation
  *
  * - [Trusted] if the chain is trusted, with the trust anchor
@@ -76,9 +97,6 @@ public class ValidateCertificateChainUsingDirectTrust<in CHAIN : Any, TRUST_ANCH
         }
     }
 }
-
-public fun interface ValidateCertificateChainUsingPKIX<in CHAIN : Any, TRUST_ANCHOR : Any> :
-    ValidateCertificateChain<CHAIN, TRUST_ANCHOR>
 
 /**
  * Changes the representation of the certificate chain
