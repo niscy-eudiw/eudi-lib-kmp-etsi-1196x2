@@ -72,6 +72,8 @@ kotlin {
         target.binaries.framework {
             baseName = "etsi_1196x2_consultation"
             isStatic = false
+            // Set valid iOS bundle identifier (no underscores)
+            binaryOption("bundleId", "eu.europa.ec.eudi.etsi1196x2.consultation")
         }
     }
 
