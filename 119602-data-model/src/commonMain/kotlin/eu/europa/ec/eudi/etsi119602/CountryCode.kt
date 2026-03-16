@@ -19,7 +19,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 
-public value class CountryCode
+
+public data class CountryCode
 @Throws(IllegalArgumentException::class)
 public constructor(
     public val value: String,

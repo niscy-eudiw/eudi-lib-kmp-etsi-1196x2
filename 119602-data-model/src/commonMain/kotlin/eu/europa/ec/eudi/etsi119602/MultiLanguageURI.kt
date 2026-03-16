@@ -32,7 +32,8 @@ public data class MultiLanguageURI(
 // TODO Value is URI
 @Serializable
 
-public value class URIValue(public val value: String) {
+
+public data class URIValue(public val value: String) {
     init {
         Assertions.requireNotBlank(value, ETSI19602.URI_VALUE)
     }

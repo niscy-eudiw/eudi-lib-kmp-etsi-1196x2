@@ -15,23 +15,10 @@
  */
 package eu.europa.ec.eudi.etsi119602
 
-import kotlinx.serialization.Serializable
-
-@Serializable
-
-
-public data class Language
-@Throws(IllegalArgumentException::class)
-public constructor(public val value: String) {
-    init {
-        Assertions.requireNotBlank(value, ETSI19602.LANG)
-        require(value.matches(ALPHA_2_PATTERN)) { "Invalid ${ETSI19602.LANG}" }
-    }
-
-    override fun toString(): String = value
-
-    public companion object {
-        public val ENGLISH: Language get() = Language(ETSI19602.LANG_ENGLISH)
-        private val ALPHA_2_PATTERN = Regex("^[a-z]{2}$")
-    }
-}
+/**
+ * Multiplatform-safe annotation for value classes.
+ * Maps to  on JVM/Android, no-op on other platforms.
+ */
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.BINARY)
+internal expect annotation class ValueClass()

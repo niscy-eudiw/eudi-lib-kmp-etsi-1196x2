@@ -298,7 +298,8 @@ public object PolicyOrLegalNoticeSerializer :
 
 @Serializable
 
-public value class HistoricalInformationPeriod(
+
+public data class HistoricalInformationPeriod(
     public val value: Int,
 )
 
