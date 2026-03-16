@@ -34,7 +34,7 @@ public data class MultilanguageString(
 }
 
 @Serializable
-@JvmInline
+
 public value class MultilingualStringValue(public val value: String) {
     init {
         require(isValid(value)) { "Invalid multilingual string" }

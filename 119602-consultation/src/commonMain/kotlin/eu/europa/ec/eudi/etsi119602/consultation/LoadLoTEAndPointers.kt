@@ -97,7 +97,7 @@ public class LoadLoTEAndPointers(
     private suspend fun ProducerScope<Event>.processLoTE(
         state: State,
         step: Step,
-    ) = withContext(Dispatchers.IO) {
+    ) = withContext(Dispatchers.Default) {
         // Check for cancellation
         currentCoroutineContext().ensureActive()
 
@@ -139,7 +139,7 @@ public class LoadLoTEAndPointers(
         state: State,
         parentStep: Step,
         event: Event.LoTELoaded,
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Unit = withContext(Dispatchers.Default) {
         val otherLoTEPointers = event.lote.schemeInformation.pointersToOtherLists
         if (otherLoTEPointers.isNullOrEmpty()) {
             return@withContext

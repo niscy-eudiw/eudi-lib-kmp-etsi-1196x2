@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.etsi119602
 import kotlinx.serialization.Serializable
 
 @Serializable
-@JvmInline
+
 public value class Language
 @Throws(IllegalArgumentException::class)
 public constructor(public val value: String) {

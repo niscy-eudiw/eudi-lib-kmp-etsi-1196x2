@@ -51,13 +51,11 @@ public data class EUListOfTrustedEntitiesProfile(
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the profile is not satisfied
      */
-    @Throws(IllegalStateException::class)
     public fun ListOfTrustedEntities.ensureCompliesToProfile() {
         checkSchemeInformation()
         checkTrustedEntities()
     }
 
-    @Throws(IllegalStateException::class)
     private fun ListOfTrustedEntities.checkSchemeInformation() {
         try {
             with(ListAndSchemeInformationAssertions) {
@@ -68,7 +66,6 @@ public data class EUListOfTrustedEntitiesProfile(
         }
     }
 
-    @Throws(IllegalStateException::class)
     private fun ListOfTrustedEntities.checkTrustedEntities() {
         val trustedEntitiesErrors = mutableMapOf<Int, String>()
         entities?.forEachIndexed { index, entity ->
@@ -156,7 +153,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the type is not the expected one
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureTypeIs(expected: URI) {
         check(type == expected) {
             "Invalid ${ETSI19602.LOTE_TYPE}. Expected $expected, got $type"
@@ -169,7 +165,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the status determination approach is not the expected one
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureStatusDeterminationApproachIs(expected: String) {
         check(statusDeterminationApproach == expected) {
             "Invalid ${ETSI19602.STATUS_DETERMINATION_APPROACH}. Expected $expected, got $statusDeterminationApproach"
@@ -182,7 +177,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the scheme community rules are not the expected ones
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureSchemeCommunityRulesIs(expected: List<MultiLanguageURI>) {
         val actual =
             Assertions.checkNotNull(schemeTypeCommunityRules, ETSI19602.SCHEME_TYPE_COMMUNITY_RULES)
@@ -197,7 +191,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the scheme territory is not the expected one
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureSchemeTerritoryIs(expected: CountryCode) {
         check(schemeTerritory == expected) {
             "Invalid ${ETSI19602.SCHEME_TERRITORY}. Expected $expected, got $schemeTerritory"
@@ -210,7 +203,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the next update is not within the expected number of months
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureNextUpdateIsWithinMonths(
         months: Int,
     ) {
@@ -226,7 +218,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the historical information period is not the expected one
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureHistoricalInformationPeriod(requirement: ValueRequirement<HistoricalInformationPeriod>) {
         when (requirement) {
             is ValueRequirement.Required -> {
@@ -247,7 +238,6 @@ internal interface ListAndSchemeInformationAssertions {
      * @receiver the list of trusted entities to check
      * @throws IllegalStateException if the list of trusted entities does not comply to the expected profile
      */
-    @Throws(IllegalStateException::class)
     fun ListAndSchemeInformation.ensureCompliesTo(listAndSchemeInformation: EUListAndSchemeInformationProfile) {
         ensureIsExplicit()
         ensureTypeIs(listAndSchemeInformation.type)
@@ -272,15 +262,12 @@ internal interface TrustedEntityAssertions {
      * @param expectedServiceTypes the expected service types
      * @throws IllegalStateException if the service type identifier is not any of the expected service types
      */
-    @Throws(IllegalStateException::class)
     fun ServiceInformation.ensureServiceTypeIsAnyOf(expectedServiceTypes: ServiceTypeIdentifiers) =
         ensureServiceTypeIsAnyOf(typeIdentifier, expectedServiceTypes)
 
-    @Throws(IllegalStateException::class)
     fun ServiceHistoryInstance.ensureServiceTypeIsAnyOf(expectedServiceTypes: ServiceTypeIdentifiers) =
         ensureServiceTypeIsAnyOf(typeIdentifier, expectedServiceTypes)
 
-    @Throws(IllegalStateException::class)
     private fun ensureServiceTypeIsAnyOf(typeIdentifier: URI?, expectedServiceTypes: ServiceTypeIdentifiers) {
         Assertions.checkNotNull(typeIdentifier, ETSI19602.SERVICE_TYPE_IDENTIFIER)
         check(typeIdentifier in expectedServiceTypes.values()) {
@@ -294,17 +281,14 @@ internal interface TrustedEntityAssertions {
      * @param mustContainX509Certificates whether the digital identity must contain X509 certificates
      * @throws IllegalStateException if the digital identity does not contain X509 certificates when required
      */
-    @Throws(IllegalStateException::class)
     fun ServiceInformation.ensureDigitalIdentityContainsX509Certificate(mustContainX509Certificates: Boolean) {
         ensureDigitalIdentityContainsX509Certificate(digitalIdentity, mustContainX509Certificates)
     }
 
-    @Throws(IllegalStateException::class)
     fun ServiceHistoryInstance.ensureDigitalIdentityContainsX509Certificate(mustContainX509Certificates: Boolean) {
         ensureDigitalIdentityContainsX509Certificate(digitalIdentity, mustContainX509Certificates)
     }
 
-    @Throws(IllegalStateException::class)
     fun ensureDigitalIdentityContainsX509Certificate(
         digitalIdentity: ServiceDigitalIdentity,
         mustContainX509Certificates: Boolean,
@@ -322,7 +306,6 @@ internal interface TrustedEntityAssertions {
      * @param statuses the expected statuses
      * @throws IllegalStateException if the service status is not in the expected statuses
      */
-    @Throws(IllegalStateException::class)
     fun ServiceInformation.ensureServiceStatusIn(statuses: Set<URI>) {
         if (statuses.isEmpty()) {
             Assertions.checkIsNull(status, ETSI19602.SERVICE_STATUS)
@@ -341,20 +324,17 @@ internal interface TrustedEntityAssertions {
      * @param trustedEntities the trusted entities profile
      * @throws IllegalStateException if the service information does not comply with the trusted entities profile
      */
-    @Throws(IllegalStateException::class)
     fun ServiceInformation.ensureCompliesTo(trustedEntities: EUTrustedEntitiesProfile) {
         ensureServiceTypeIsAnyOf(trustedEntities.serviceTypeIdentifiers)
         ensureDigitalIdentityContainsX509Certificate(trustedEntities.serviceDigitalIdentityMustHaveCertificates)
         ensureServiceStatusIn(trustedEntities.serviceStatuses)
     }
 
-    @Throws(IllegalStateException::class)
     fun ServiceHistoryInstance.ensureCompliesTo(trustedEntities: EUTrustedEntitiesProfile) {
         ensureServiceTypeIsAnyOf(trustedEntities.serviceTypeIdentifiers)
         ensureDigitalIdentityContainsX509Certificate(trustedEntities.serviceDigitalIdentityMustHaveCertificates)
     }
 
-    @Throws(IllegalStateException::class)
     fun TrustedEntity.ensureTrustedEntities(trustedEntities: EUTrustedEntitiesProfile) {
         services.forEach { service ->
             service.information.ensureCompliesTo(trustedEntities)

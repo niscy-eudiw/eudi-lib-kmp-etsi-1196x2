@@ -31,7 +31,6 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
  * val empty = NonEmptyList(emptyList<Int>())    // throws IllegalArgumentException
  * ```
  */
-@JvmInline
 public value class NonEmptyList<out T>(public val list: List<T>) {
     init {
         require(list.isNotEmpty()) { "Non-empty list expected, but was empty" }

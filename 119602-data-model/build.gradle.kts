@@ -60,6 +60,20 @@ kotlin {
             }
     }
 
+    // iOS targets
+    iosArm64()
+    iosX64()
+    iosSimulatorArm64()
+
+    // Configure iOS frameworks
+    val iosTargets = listOf(iosArm64(), iosX64(), iosSimulatorArm64())
+    iosTargets.forEach { target ->
+        target.binaries.framework {
+            baseName = "etsi_119602_data_model"
+            isStatic = false
+        }
+    }
+
     // Set up targets
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     applyDefaultHierarchyTemplate {
@@ -71,6 +85,13 @@ kotlin {
                 // Provide which targets would be part of this group
                 withJvm()
                 withAndroidTarget()
+            }
+
+            group("ios") {
+                // iOS targets group
+                withIosArm64()
+                withIosX64()
+                withIosSimulatorArm64()
             }
         }
     }

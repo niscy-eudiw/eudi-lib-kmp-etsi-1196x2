@@ -297,7 +297,7 @@ public object PolicyOrLegalNoticeSerializer :
 }
 
 @Serializable
-@JvmInline
+
 public value class HistoricalInformationPeriod(
     public val value: Int,
 )

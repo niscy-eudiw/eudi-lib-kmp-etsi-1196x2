@@ -66,7 +66,7 @@ public class LoadSingleLoTEWithFileCache internal constructor(
     private val downloadSingleLoTE: DownloadSingleLoTE? = null,
     private val clock: Clock = Clock.System,
     private val fileCacheExpiration: Duration = 24.hours,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : LoadLoTE<String> {
 
     public constructor(
@@ -75,7 +75,7 @@ public class LoadSingleLoTEWithFileCache internal constructor(
         downloadSingleLoTE: DownloadSingleLoTE? = null,
         clock: Clock = Clock.System,
         fileCacheExpiration: Duration = 24.hours,
-        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) : this(
         LoTEFileStore(cacheDirectory, fileSystem, ioDispatcher),
         downloadSingleLoTE,
@@ -162,7 +162,7 @@ public class LoadSingleLoTEWithFileCache internal constructor(
 internal class LoTEFileStore(
     private val cacheDirectory: Path,
     fileSystem: FileSystem = SystemFileSystem,
-    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     private val fileNames = FileNames(cacheDirectory)
@@ -267,7 +267,7 @@ internal class LoTEFileStore(
 
 internal class FileOperation(
     private val fileSystem: FileSystem,
-    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     private val actualIoDispatcher = ioDispatcher.limitedParallelism(1)

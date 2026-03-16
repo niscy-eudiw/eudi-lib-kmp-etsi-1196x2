@@ -75,7 +75,7 @@ public interface CertificateProfileValidator<CERT : Any> {
          */
         public operator fun <CERT : Any> invoke(
             operations: CertificateOperations<CERT>,
-            dispatcher: CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
+            dispatcher: CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default,
         ): CertificateProfileValidator<CERT> =
             invoke(CertificateProfileInterpreter(operations, dispatcher))
 
