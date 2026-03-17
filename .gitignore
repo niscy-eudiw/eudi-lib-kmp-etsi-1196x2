@@ -25,3 +25,7 @@ gradle-app.setting
 build
 local.properties
 .kotlin
+
+# Ignore iOS distribution frameworks (regenerate using build-ios-distribution.sh)
+# Keep the README.md but ignore the generated Frameworks folder
+ios-distribution/Frameworks/
