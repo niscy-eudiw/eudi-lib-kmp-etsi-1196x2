@@ -134,6 +134,15 @@ kotlin {
                 // Platform-specific dependencies if needed
             }
         }
+
+        val jvmAndAndroidTest by getting {
+            dependencies {
+                // Add consultation module test sources for CertOps helper
+                implementation(projects.etsi1196x2Consultation)
+                // BouncyCastle for test certificate generation
+                implementation(libs.bouncy.castle)
+            }
+        }
     }
 }
 

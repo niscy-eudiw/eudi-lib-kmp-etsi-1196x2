@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.etsi1196x2.signum
 
 import at.asitplus.signum.indispensable.asn1.Asn1BitString
 import at.asitplus.signum.indispensable.asn1.Asn1Element
-import at.asitplus.signum.indispensable.asn1.Asn1PrimitiveOctetString
+import at.asitplus.signum.indispensable.asn1.Asn1OctetString
 import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
 import at.asitplus.signum.indispensable.asn1.encoding.decodeToBoolean
 import at.asitplus.signum.indispensable.asn1.encoding.decodeToInt
@@ -78,7 +78,7 @@ public class SignumCertificateOperations : CertificateOperations<X509Certificate
 
         return try {
             // The extension value is an OCTET STRING containing the DER-encoded BasicConstraints
-            val octetString = extension.value as? Asn1PrimitiveOctetString
+            val octetString = extension.value as? Asn1OctetString
                 ?: return BasicConstraintsInfo(isCa = false, pathLenConstraint = null)
 
             // Parse the OCTET STRING content to get the SEQUENCE
@@ -151,7 +151,7 @@ public class SignumCertificateOperations : CertificateOperations<X509Certificate
 
         return try {
             // The extension value is an OCTET STRING containing the DER-encoded QCStatements
-            val octetString = extension.value as? Asn1PrimitiveOctetString
+            val octetString = extension.value as? Asn1OctetString
                 ?: return emptyList()
 
             // Parse the OCTET STRING content to get the SEQUENCE OF QCStatement
@@ -217,7 +217,7 @@ public class SignumCertificateOperations : CertificateOperations<X509Certificate
 
         return try {
             // The extension value is an OCTET STRING containing the DER-encoded BIT STRING
-            val octetString = extension.value as? Asn1PrimitiveOctetString
+            val octetString = extension.value as? Asn1OctetString
                 ?: return null
 
             // Parse the OCTET STRING content to get the BIT STRING
@@ -307,7 +307,7 @@ public class SignumCertificateOperations : CertificateOperations<X509Certificate
 
         return try {
             // The extension value is an OCTET STRING containing the DER-encoded CertificatePolicies
-            val octetString = extension.value as? Asn1PrimitiveOctetString
+            val octetString = extension.value as? Asn1OctetString
                 ?: return emptyList()
 
             // Parse the OCTET STRING content to get the SEQUENCE OF PolicyInformation
@@ -399,7 +399,7 @@ public class SignumCertificateOperations : CertificateOperations<X509Certificate
 
         try {
             // The extension value is an OCTET STRING containing the DER-encoded AIA
-            val octetString = extension.value as? Asn1PrimitiveOctetString
+            val octetString = extension.value as? Asn1OctetString
                 ?: return null
 
             // Parse the OCTET STRING content to get the SEQUENCE OF AccessDescription
