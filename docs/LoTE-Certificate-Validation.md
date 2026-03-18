@@ -36,15 +36,17 @@ TS 119 602) can be used to validate certificate chains for attestations issued i
 
 | Provider List        | ETSI TS 119 602 Annex | LoTE Certificate Type                              | What LoTE Validates        | Certificate Chain Validation        |
 |----------------------|-----------------------|----------------------------------------------------|----------------------------|-------------------------------------|
-| **PID Providers**    | Annex D               | End-entity OR CA¹                                  | PID signing certificate    | **Direct Trust OR PKIX**¹           |
-| **Wallet Providers** | Annex E               | End-entity OR CA¹                                  | Wallet signing certificate | **Direct Trust OR PKIX**¹           |
+| **PID Providers (Issuance)**    | Annex D               | End-entity OR CA¹                                  | PID signing certificate    | **Direct Trust OR PKIX**¹           |
+| **PID Providers (Revocation)**  | Annex D               | CA¹                                  | TSL JWT `x5c` chain    | **PKIX**           |
+| **Wallet Providers (Issuance)** | Annex E               | End-entity OR CA¹                                  | Wallet signing certificate | **Direct Trust OR PKIX**¹           |
+| **Wallet Providers (Revocation)** | Annex E          | CA¹                                  | TSL JWT `x5c` chain    | **PKIX**           |
 | **WRPAC Providers**  | Annex F               | CA (WRPAC Provider)                                | WRPAC X.509 certificate    | **PKIX**                            |
 | **WRPRC Providers (Issuance)**  | Annex G               | CA (WRPRC Provider)²                               | WRPRC JWT `x5c` chain      | **PKIX**                            |
 | **WRPRC Providers (Revocation)** | Annex G          | CA (WRPRC Provider)³                               | TSL JWT/CWT `x5c` chain    | **PKIX**                            |
 
 **Footnotes:**
 
-¹ **PID/Wallet Specification Ambiguity:** ETSI TS 119 602 Annexes D and E describe the *purpose* of certificates ("verify the signature... on the person identification data" / "authenticate and validate the components of the wallet unit") but do not explicitly specify whether the certificate must be end-entity or CA. The functional description is compatible with **both** Direct Trust (end-entity in LoTE) and PKIX (CA in LoTE) validation methods. Implementations should support both validation methods. See Section 1.7 for detailed analysis.
+¹ **PID/Wallet Specification Ambiguity:** ETSI TS 119 602 Annexes D and E describe the *purpose* of certificates ("verify the signature... on the person identification data" / "authenticate and validate the components of the wallet unit") but do not explicitly specify whether the certificate must be end-entity or CA. The functional description is compatible with **both** Direct Trust (end-entity in LoTE) and PKIX (CA in LoTE) validation methods. For **Issuance service**, implementations should support both validation methods. For **Revocation service** (Token Status List), the LoTE contains a CA certificate and PKIX validation is required. See Sections 1.7 and 2.7 for detailed analysis.
 
 ² **WRPRC Issuance Service:** Table G.3 wording ("verify the signature... on the registration certificate it provides") is identical to Table F.3 (WRPAC), indicating the LoTE contains a **CA certificate** (WRPRC Provider), not an end-entity signing certificate. The WRPRC JWT `x5c` header contains "the whole certificate chain" (ETSI TS 119 475 Table 5), which builds via PKIX to the LoTE CA. See Section 4.2.2 for detailed analysis.
 
@@ -52,7 +54,10 @@ TS 119 602) can be used to validate certificate chains for attestations issued i
 
 **Critical Distinction:**
 
-- **PID/Wallet Providers**: Sign data directly → End-entity OR CA certificate in LoTE → Direct Trust OR PKIX validation - *Specification allows both options*
+- **PID Providers (Issuance)**: Sign PID attestations directly → End-entity OR CA certificate in LoTE → Direct Trust OR PKIX validation - *Specification allows both options*
+- **PID Providers (Revocation)**: Sign Token Status Lists → CA certificate in LoTE → PKIX validation (chain from TSL `x5c` to LoTE CA), then TSL signature verification + bit check
+- **Wallet Providers (Issuance)**: Sign Wallet attestations directly → End-entity OR CA certificate in LoTE → Direct Trust OR PKIX validation - *Specification allows both options*
+- **Wallet Providers (Revocation)**: Sign Token Status Lists → CA certificate in LoTE → PKIX validation (chain from TSL `x5c` to LoTE CA), then TSL signature verification + bit check
 - **WRPAC Providers**: Issue X.509 certificates to Relying Parties → CA certificate in LoTE → PKIX validation (chain from WRPAC to LoTE CA)
 - **WRPRC Providers (Issuance)**: Sign JWT attestations → CA certificate in LoTE → PKIX validation (chain from WRPRC `x5c` to LoTE CA), then JWT signature verification
 - **WRPRC Providers (Revocation)**: Sign Token Status Lists → CA certificate in LoTE → PKIX validation (chain from TSL `x5c` to LoTE CA), then TSL signature verification
@@ -60,6 +65,43 @@ TS 119 602) can be used to validate certificate chains for attestations issued i
 **Note on WRPRC:** The WRPRC itself is a JWT attestation (NOT an X.509 certificate). The certificate chain validation (
 PKIX) verifies the `x5c` certificates in the WRPRC JWT header against the LoTE. JWT signature verification is a separate
 step that uses the validated certificate.
+
+**PID Attestation Architecture:**
+
+- **PID Provider** = Signs PID attestations (acts as end-entity or CA)
+- **PID Attestation** = SD-JWT-VC or mDoc containing person identification data
+- **PID `x5c`** = Certificate chain to verify PID signature (end-entity → intermediate → LoTE CA for SD-JWT-VC)
+- **LoTE (Issuance)** = Contains PID Provider's certificate (end-entity or CA)
+- **Certificate Chain Validation** = Direct Trust OR PKIX (for SD-JWT-VC)
+- **Attestation Signature Verification** = Uses validated certificate (separate step)
+
+**PID Token Status List Architecture (for SD-JWT-VC):**
+
+- **Token Status List (TSL)** = JWT containing revocation status bitstring for PID attestations
+- **PID Attestation (SD-JWT-VC)** = Contains `status.status_list` object with TSL URI and bit index
+- **TSL `x5c`** = Certificate chain to verify TSL signature (end-entity → intermediate → LoTE CA)
+- **LoTE (Revocation)** = Contains PID Provider's CA certificate (trust anchor for TSL)
+- **TSL Validation** = PKIX (chain from TSL `x5c` to LoTE CA) + signature verification + bit check
+
+**Note:** For mDoc-encoded PID attestations, revocation may use Token Status List OR List Identifiers per ISO/IEC 18013-5 2nd edition (unpublished).
+
+**Wallet Attestation Architecture:**
+
+- **Wallet Provider** = Signs Wallet attestations (acts as end-entity or CA)
+- **Wallet Instance Attestation (WIA)** = JWT attesting wallet instance properties
+- **Wallet Unit Attestation (WUA)** = JWT attesting wallet unit properties
+- **WIA/WUA `x5c`** = Certificate chain to verify attestation signature
+- **LoTE (Issuance)** = Contains Wallet Provider's certificate (end-entity or CA)
+- **Certificate Chain Validation** = Direct Trust OR PKIX
+- **Attestation Signature Verification** = Uses validated certificate (separate step)
+
+**Wallet Token Status List Architecture (for WUA):**
+
+- **Token Status List (TSL)** = JWT containing revocation status bitstring for WUA
+- **WUA** = Contains `status.status_list` object with TSL URI and bit index
+- **TSL `x5c`** = Certificate chain to verify TSL signature
+- **LoTE (Revocation)** = Contains Wallet Provider's CA certificate (trust anchor for TSL)
+- **TSL Validation** = PKIX + signature verification + bit check
 
 **WRPAC Certificate Architecture:**
 
@@ -94,7 +136,10 @@ step that uses the validated certificate.
 ### HAIP v1 / OpenID4VCI v1 Context
 
 - `x5c` in JWT header MUST NOT include trust anchor (per HAIP v1)
-- For PID/Wallet: `x5c` contains end-entity, LoTE contains end-entity (Direct Trust) OR CA (PKIX) → **Support both validation methods**
+- For PID (Issuance): `x5c` contains end-entity, LoTE contains end-entity (Direct Trust) OR CA (PKIX) → **Support both validation methods**
+- For PID (Revocation): TSL `x5c` contains cert chain (end-entity → CA), LoTE (Revocation) contains CA → PKIX path validation required (then TSL signature verification + bit check)
+- For Wallet (Issuance): `x5c` contains end-entity, LoTE contains end-entity (Direct Trust) OR CA (PKIX) → **Support both validation methods**
+- For Wallet (Revocation): TSL `x5c` contains cert chain (end-entity → CA), LoTE (Revocation) contains CA → PKIX path validation required (then TSL signature verification + bit check)
 - For WRPAC: `x5c` contains end-entity, LoTE contains CA → PKIX path validation required
 - For WRPRC: `x5c` in WRPRC JWT header contains cert chain (end-entity → CA), LoTE (Issuance) contains CA → PKIX path validation required (then JWT signature verification)
 - For TSL: `x5c` in TSL JWT/CWT header contains cert chain (end-entity → CA), LoTE (Revocation) contains CA → PKIX path validation required (then TSL signature verification + bit check)
@@ -342,16 +387,212 @@ When the LoTE contains a CA certificate, validation is performed via PKIX path v
 
 ---
 
-## 1.6 Open Questions for Further Investigation
+## 1.6 PID Revocation
+
+PID attestations MUST be revocable. The revocation mechanism depends on the PID attestation format:
+
+### 1.6.1 Specification Basis
+
+**ETSI TS 119 472-3** (PID attestation issuance) profiles **HAIP v1** (High Assurance Interoperability Profile 1.0), which in turn references:
+
+- **For SD-JWT-VC encoded PID**: IETF draft-ietf-oauth-status-list (Token Status List)
+- **For mDoc encoded PID**: ISO/IEC 18013-5 2nd edition (List Identifiers or Token Status List)
+
+**HAIP v1 Requirements** (openid4vc-high-assurance-interoperability-profile-1_0):
+
+*SD-JWT-VC Profile:*
+> "The `status` claim, if present, MUST contain `status_list` as defined in [@!I-D.ietf-oauth-status-list]"
+
+*mDoc Profile:*
+> "The Credential Issuer MAY include the MSO revocation mechanism in the issued mdoc. When doing so, it MUST use one of the mechanisms defined in ISO/IEC 18013-5 ([@!ISO.18013-5.second.edition])."
+
+### 1.6.2 SD-JWT-VC Encoded PID - Token Status List
+
+For PID attestations encoded as SD-JWT-VC, the Token Status List mechanism from IETF draft-ietf-oauth-status-list MUST be used.
+
+**Status Claim Format:**
+
+Per IETF draft-ietf-oauth-status-list, the `status` claim in the JWT payload contains a `status_list` object:
+
+```json
+{
+  "status": {
+    "status_list": {
+      "uri": "https://pid-provider.example/status-list",
+      "index": 12345
+    }
+  }
+}
+```
+
+**Key Points:**
+- **Single claim**: `status` (not separate `status_list_uri` and `status_list_index`)
+- **Object structure**: `status_list` is an object with two properties:
+  - `uri`: URI to fetch the Token Status List
+  - `index`: Bit position in the status list bitstring
+- **Privacy**: Each PID attestation MUST have a unique, unpredictable index (per draft-ietf-oauth-status-list Section 13.2)
+
+### 1.6.3 mDoc Encoded PID - ISO/IEC 18013-5 2nd Edition
+
+For PID attestations encoded as mDoc, ISO/IEC 18013-5 2nd edition defines revocation mechanisms:
+
+- **List Identifiers**: Document identifier-based revocation lists
+- **Token Status List**: May also be supported (implementation-specific)
+
+**Note:** ISO/IEC 18013-5 2nd edition is unpublished at the time of writing. The specific revocation mechanism details should be verified against the final published specification.
+
+### 1.6.4 PID Providers List - Revocation Service
+
+Per ETSI TS 119 602 Annex D Table D.3, the PID Providers List supports TWO service types:
+
+| Service Type Identifier | Purpose |
+|------------------------|---------|
+| `http://uri.etsi.org/19602/SvcType/PID/Issuance` | Validate PID attestation signature (Section 1.4) |
+| `http://uri.etsi.org/19602/SvcType/PID/Revocation` | Validate Token Status List signature (this section) |
+
+**ServiceDigitalIdentity for Revocation Service:**
+
+The ServiceDigitalIdentity component shall contain one or more X.509 certificates that can be used to verify the signature or seal created by the provider of person identification data **on the Token Status List**.
+
+**Critical Finding:** The LoTE (Revocation service) contains a **CA certificate** for validating the Token Status List signature, following the same pattern as the Issuance service.
+
+### 1.6.5 TSL Validation Flow for PID (SD-JWT-VC)
+
+```
+┌─────────────────────────────────────────┐
+│  EU PID Providers LoTE                  │
+│  (Revocation Service)                   │
+│  - PID Provider CA Certificate          │
+│  - basicConstraints: cA=TRUE            │
+│  - Trust Anchor                         │
+│  ★ PUBLISHED IN LoTE ★                  │
+└─────────────────────────────────────────┘
+         ▲
+         │ PKIX chain validation
+         │
+┌─────────────────────────────────────────┐
+│  Token Status List (TSL) x5c Chain      │
+│  - [0]: End-entity signing cert         │
+│  - [1]: Intermediate CA (opt)           │
+│  - basicConstraints: cA=TRUE            │
+└─────────────────────────────────────────┘
+         │
+         │ Signs
+         ▼
+┌─────────────────────────────────────────┐
+│  Token Status List (JWT)                │
+│  - Header: { typ: application/status+jwt, │
+│              alg: ES256,                │
+│              x5c: [...] }               │
+│  - Payload: {                           │
+│      status_list: {                     │
+│        bits: "00000000...",             │
+│        uri: "..."                       │
+│      }                                  │
+│    }                                    │
+│  - Signature                            │
+└─────────────────────────────────────────┘
+         ▲
+         │ Referenced by
+         │
+┌─────────────────────────────────────────┐
+│  PID Attestation (SD-JWT-VC) Payload    │
+│  - status: {                            │
+│      status_list: {                     │
+│        uri: "https://...",              │
+│        index: 12345                     │
+│      }                                  │
+│    }                                    │
+└─────────────────────────────────────────┘
+
+LoTE ServiceDigitalIdentity (Revocation) contains: PID Provider CA certificate (X.509)
+Validation Method: PKIX (TSL x5c chain → LoTE CA), then TSL signature verification, then bit check
+```
+
+### 1.6.6 Validation Steps for PID with TSL
+
+**For SD-JWT-VC encoded PID with Token Status List:**
+
+**Phase 1: Extract TSL Reference from PID**
+
+1. Parse PID SD-JWT-VC payload
+2. Extract `status.status_list.uri` (TSL endpoint)
+3. Extract `status.status_list.index` (bit position)
+
+**Phase 2: Certificate Chain Validation (PKIX)**
+
+4. Fetch Token Status List (JWT) from URI
+5. Parse TSL header
+6. Extract `x5c` certificate chain from header
+7. Load trust anchors from EU PID Providers LoTE (Revocation service - CA certificates)
+8. Build certification path from `x5c` end-entity certificate to LoTE CA
+9. Validate chain using PKIX (RFC 5280 Section 6.3):
+    - Verify signatures along the chain
+    - Verify validity periods
+    - Verify basicConstraints (cA=TRUE for intermediate CA)
+    - Verify keyUsage (keyCertSign for CA, digitalSignature for end-entity)
+    - Check revocation status (CRL/OCSP)
+
+**Phase 3: TSL Signature Verification and Status Check**
+
+10. Extract validated end-entity signing certificate from `x5c`
+11. Verify TSL signature using the certificate's public key
+12. Parse TSL payload to extract status bitstring
+13. Check bit at `status.status_list.index`:
+    - **0 (valid)**: PID attestation is currently trusted
+    - **1 (revoked)**: PID attestation has been revoked
+14. Return revocation status
+
+**For mDoc encoded PID:**
+- Follow ISO/IEC 18013-5 2nd edition revocation mechanism (TBD when published)
+- May use List Identifiers OR Token Status List
+
+### 1.6.7 Complete PID Validation Flow (SD-JWT-VC)
+
+Complete PID validation for SD-JWT-VC requires **three** validation steps:
+
+```
+1. PID Certificate Chain Validation (PKIX or Direct Trust)
+   → Uses LoTE (Issuance service)
+   → Validates PID Provider's signature capability
+
+2. PID Attestation Signature Verification (SD-JWT)
+   → Uses validated certificate from step 1
+   → Validates PID payload integrity
+
+3. Token Status List Validation
+   → Uses LoTE (Revocation service)
+   → Checks PID revocation status
+   → Returns: VALID or REVOKED
+```
+
+**Finding 1.6.7:** The PID Providers LoTE serves **dual purposes**:
+- **Issuance service**: Validates PID attestation signature (proves PID authenticity)
+- **Revocation service**: Validates Token Status List signature (proves PID is not revoked)
+
+Both services use PKIX certificate chain validation against CA certificates in the LoTE, but they validate **different certificates** (PID signing cert vs TSL signing cert).
+
+---
+
+## 1.7 Open Questions for Further Investigation
 
 1. **Implementation Practice:** Do actual EU PID Provider implementations use self-signed or CA-issued certificates?
 
 2. **Revocation for Self-Signed:** If a PID Provider uses self-signed certificates, what are the revocation mechanisms?
+    - **Status:** **Answered by v1.2.1 pattern** - Token Status List for SD-JWT-VC, TSL or List Identifiers for mDoc (ISO/IEC 18013-5 2nd ed)
 
-3. **Multi-Certificate LoTE:** Can a single PID Provider have multiple end-entity certificates in the LoTE (e.g., for
+3. **PID Revocation - Token Status List:** ETSI TS 119 475 v1.2.1 introduces Token Status List for WRPRC revocation. Following the same pattern:
+    - **Status:** SD-JWT-VC encoded PID MUST use Token Status List
+    - PID contains `status.status_list` object with TSL URI and bit index
+    - TSL is a JWT with its own `x5c` chain
+    - PID Providers LoTE (Revocation service) contains CA certificate for TSL validation
+    - **Confirmed:** Annex D explicitly defines Issuance/Revocation service types (Table D.3)
+    - **Open:** mDoc revocation mechanism TBD (ISO/IEC 18013-5 2nd edition unpublished)
+
+4. **Multi-Certificate LoTE:** Can a single PID Provider have multiple end-entity certificates in the LoTE (e.g., for
    key rotation)?
 
-4. **National Variations:** Are there national implementations that deviate from the EU PID Providers List profile?
+5. **National Variations:** Are there national implementations that deviate from the EU PID Providers List profile?
 
 **Implementation Note:** Per EN 319 412-2 §4.3.3, the certificatePolicies extension shall be present. The specific
 policy OIDs are TSP-defined (not mandated by ETSI TS 119 412-6). The validator checks for the presence of the
@@ -359,7 +600,7 @@ certificatePolicies extension but does not validate specific OID values.
 
 ---
 
-## 1.7 Specification Ambiguity Analysis
+## 1.8 Specification Ambiguity Analysis
 
 ### 1.7.1 The Ambiguity in ETSI TS 119 602 Annex D
 
@@ -663,17 +904,198 @@ When the LoTE contains a CA certificate, validation is performed via PKIX path v
 
 ---
 
-## 2.6 Open Questions for Further Investigation
+## 2.6 Wallet Token Status List Validation - Revocation Service
+
+ETSI TS 119 475 v1.2.1 (March 2026) introduces a **Token Status List (TSL)** mechanism for WRPRC revocation checking. Following the same pattern, Wallet Unit Attestations (WUA) MUST support revocation via Token Status List. Wallet Instance Attestations (WIA) may have different revocation mechanisms (TBD).
+
+This section covers using the Wallet Providers List with **service type Revocation** to validate the Token Status List signature for WUA.
+
+### 2.6.1 IETF Token Status List Format
+
+Per IETF draft-ietf-oauth-status-list, the `status` claim in the JWT payload contains a `status_list` object:
+
+```json
+{
+  "status": {
+    "status_list": {
+      "uri": "https://wallet-provider.example/status-list",
+      "index": 12345
+    }
+  }
+}
+```
+
+**Key Points:**
+- **Single claim**: `status` (not separate `status_list_uri` and `status_list_index`)
+- **Object structure**: `status_list` is an object with two properties:
+  - `uri`: URI to fetch the Token Status List
+  - `index`: Bit position in the status list bitstring
+- **Privacy**: Each WUA MUST have a unique, unpredictable index (per draft-ietf-oauth-status-list Section 13.2)
+
+**Reference:** IETF draft-ietf-oauth-status-list, Section 5 ("Status Claim")
+
+### 2.6.2 Wallet Providers List - Revocation Service
+
+Following the pattern established in ETSI TS 119 602 Annex G (WRPRC Providers), the Wallet Providers List (Annex E) supports TWO service types:
+
+| Service Type Identifier | Purpose |
+|------------------------|---------|
+| `http://uri.etsi.org/19602/SvcType/WalletSolution/Issuance` | Validate Wallet attestation signature (Section 2.4) |
+| `http://uri.etsi.org/19602/SvcType/WalletSolution/Revocation` | Validate Token Status List signature (this section) |
+
+**Note:** Per ETSI TS 119 602 Annex E Table E.3, the service type identifiers use `WalletSolution` (not `Wallet`).
+
+**ServiceDigitalIdentity for Revocation Service:**
+
+> "The ServiceDigitalIdentity component shall contain one or more X.509 certificates that can be used to verify the signature or seal created by the wallet provider **on the Token Status List**..."
+
+**Critical Finding:** The LoTE (Revocation service) contains a **CA certificate** for validating the Token Status List signature, following the same pattern as the Issuance service.
+
+### 2.6.3 WUA Revocation Requirements
+
+**Wallet Unit Attestation (WUA):**
+- MUST contain `status.status_list` object in payload
+- TSL is a JWT with its own `x5c` chain
+- TSL signature validated against LoTE (Revocation service)
+- WUA revocation indicates the wallet unit is no longer trusted
+
+**Wallet Instance Attestation (WIA):**
+- Revocation mechanism TBD (may use different approach)
+- WIA revocation indicates the wallet instance is no longer trusted
+- May use Token Status List or alternative mechanism
+
+### 2.6.4 TSL Validation Flow for WUA
+
+```
+┌─────────────────────────────────────────┐
+│  EU Wallet Providers LoTE               │
+│  (Revocation Service)                   │
+│  - Wallet Provider CA Certificate       │
+│  - basicConstraints: cA=TRUE            │
+│  - Trust Anchor                         │
+│  ★ PUBLISHED IN LoTE ★                  │
+└─────────────────────────────────────────┘
+         ▲
+         │ PKIX chain validation
+         │
+┌─────────────────────────────────────────┐
+│  Token Status List (TSL) x5c Chain      │
+│  - [0]: End-entity signing cert         │
+│  - [1]: Intermediate CA (opt)           │
+│  - basicConstraints: cA=TRUE            │
+└─────────────────────────────────────────┘
+         │
+         │ Signs
+         ▼
+┌─────────────────────────────────────────┐
+│  Token Status List (JWT)                │
+│  - Header: { typ: application/status+jwt, │
+│              alg: ES256,                │
+│              x5c: [...] }               │
+│  - Payload: {                           │
+│      status_list: {                     │
+│        bits: "00000000...",             │
+│        uri: "..."                       │
+│      }                                  │
+│    }                                    │
+│  - Signature                            │
+└─────────────────────────────────────────┘
+         ▲
+         │ Referenced by
+         │
+┌─────────────────────────────────────────┐
+│  WUA JWT Payload                        │
+│  - status: {                            │
+│      status_list: {                     │
+│        uri: "https://...",              │
+│        index: 12345                     │
+│      }                                  │
+│    }                                    │
+└─────────────────────────────────────────┘
+
+LoTE ServiceDigitalIdentity (Revocation) contains: Wallet Provider CA certificate (X.509)
+Validation Method: PKIX (TSL x5c chain → LoTE CA), then TSL signature verification, then bit check
+```
+
+### 2.6.5 Validation Steps for WUA with TSL
+
+**Phase 1: Extract TSL Reference from WUA**
+
+1. Parse WUA JWT payload
+2. Extract `status.status_list.uri` (TSL endpoint)
+3. Extract `status.status_list.index` (bit position)
+
+**Phase 2: Certificate Chain Validation (PKIX)**
+
+4. Fetch Token Status List (JWT) from URI
+5. Parse TSL header
+6. Extract `x5c` certificate chain from header
+7. Load trust anchors from EU Wallet Providers LoTE (Revocation service - CA certificates)
+8. Build certification path from `x5c` end-entity certificate to LoTE CA
+9. Validate chain using PKIX (RFC 5280 Section 6.3):
+    - Verify signatures along the chain
+    - Verify validity periods
+    - Verify basicConstraints (cA=TRUE for intermediate CA)
+    - Verify keyUsage (keyCertSign for CA, digitalSignature for end-entity)
+    - Check revocation status (CRL/OCSP)
+
+**Phase 3: TSL Signature Verification and Status Check**
+
+10. Extract validated end-entity signing certificate from `x5c`
+11. Verify TSL signature using the certificate's public key
+12. Parse TSL payload to extract status bitstring
+13. Check bit at `status.status_list.index`:
+    - **0 (valid)**: WUA is currently trusted
+    - **1 (revoked)**: WUA has been revoked
+14. Return revocation status
+
+### 2.6.6 Complete WUA Validation Flow
+
+Complete WUA validation requires **three** validation steps:
+
+```
+1. WUA Certificate Chain Validation (PKIX or Direct Trust)
+   → Uses LoTE (Issuance service)
+   → Validates Wallet Provider's signature capability
+
+2. WUA JWT Signature Verification (JWS)
+   → Uses validated certificate from step 1
+   → Validates WUA payload integrity
+
+3. Token Status List Validation
+   → Uses LoTE (Revocation service)
+   → Checks WUA revocation status
+   → Returns: VALID or REVOKED
+```
+
+**Finding 2.6.6:** The Wallet Providers LoTE serves **dual purposes**:
+- **Issuance service**: Validates WUA/WIA signature (proves attestation authenticity)
+- **Revocation service**: Validates Token Status List signature (proves WUA is not revoked)
+
+Both services use PKIX certificate chain validation against CA certificates in the LoTE, but they validate **different certificates** (WUA signing cert vs TSL signing cert).
+
+---
+
+## 2.7 Open Questions for Further Investigation
 
 1. **Implementation Practice:** Do actual EU Wallet Provider implementations use self-signed or CA-issued certificates?
 
 2. **Revocation for Self-Signed:** If a Wallet Provider uses self-signed certificates, what are the revocation
    mechanisms?
+    - **Status:** **Answered by v1.2.1 pattern** - Token Status List for WUA, mechanism TBD for WIA
 
-3. **Multi-Certificate LoTE:** Can a single Wallet Provider have multiple end-entity certificates in the LoTE (e.g., for
+3. **Wallet Revocation - Token Status List:** ETSI TS 119 475 v1.2.1 introduces Token Status List for WRPRC revocation. Following the same pattern:
+    - **Status:** WUA MUST use Token Status List
+    - WUA contains `status.status_list` object with TSL URI and bit index
+    - TSL is a JWT with its own `x5c` chain
+    - Wallet Providers LoTE (Revocation service) contains CA certificate for TSL validation
+    - **Confirmed:** Annex E explicitly defines Issuance/Revocation service types (Table E.3)
+    - **Open:** WIA revocation mechanism TBD
+
+4. **Multi-Certificate LoTE:** Can a single Wallet Provider have multiple end-entity certificates in the LoTE (e.g., for
    different wallet solutions or key rotation)?
 
-4. **National Variations:** Are there national implementations that deviate from the EU Wallet Providers List profile?
+5. **National Variations:** Are there national implementations that deviate from the EU Wallet Providers List profile?
 
 **Implementation Note:** Per EN 319 412-2 §4.3.3, the certificatePolicies extension shall be present. The specific
 policy OIDs are TSP-defined (not mandated by ETSI TS 119 412-6). The validator checks for the presence of the
@@ -1456,8 +1878,10 @@ Both services use PKIX certificate chain validation against CA certificates in t
 
 | Provider List        | Validation Methods | Specification Status           |
 |----------------------|--------------------|--------------------------------|
-| **PID Providers**    | Direct Trust AND PKIX | Ambiguous (Annex D)         |
-| **Wallet Providers** | Direct Trust AND PKIX | Ambiguous (Annex E)         |
+| **PID Providers (Issuance)**    | Direct Trust AND PKIX | Ambiguous (Annex D)         |
+| **PID Providers (Revocation)**  | PKIX + TSL Signature | Pattern from TS 119 475 v1.2.1 |
+| **Wallet Providers (Issuance)** | Direct Trust AND PKIX | Ambiguous (Annex E)         |
+| **Wallet Providers (Revocation)** | PKIX + TSL Signature | Pattern from TS 119 475 v1.2.1 |
 | **WRPAC Providers**  | PKIX                | Clear (Annex F)                |
 | **WRPRC Providers (Issuance)**  | PKIX + JWT Signature | Clear (Annex G + TS 119 475 v1.2.1) |
 | **WRPRC Providers (Revocation)** | PKIX + TSL Signature | Clear (TS 119 475 v1.2.1) |
@@ -1466,9 +1890,9 @@ Both services use PKIX certificate chain validation against CA certificates in t
 
 #### IG.2.1 For PID and Wallet Providers
 
-The specification allows both Direct Trust and PKIX validation. Implementations should:
+The specification allows both Direct Trust and PKIX validation for **Issuance service**. For **Revocation service** (Token Status List), PKIX validation is required.
 
-1. **Support Both Validation Methods**
+1. **Support Both Validation Methods (Issuance Service)**
    - Direct Trust: For deployments where LoTE contains end-entity certificates
    - PKIX: For deployments where LoTE contains CA certificates
    - Both options are valid per the specification
@@ -1482,6 +1906,26 @@ The specification allows both Direct Trust and PKIX validation. Implementations 
    - Track ETSI corrigenda or new revisions
    - Monitor national implementation guidance
    - Adjust implementation based on clarified requirements
+
+4. **PID Token Status List Validation (Revocation Service) - for SD-JWT-VC**
+   - Extract `status.status_list.uri` and `status.status_list.index` from PID payload
+   - Fetch Token Status List (JWT) from URI
+   - Extract certificate chain from TSL `x5c`
+   - Build path from TSL `x5c` end-entity to LoTE trust anchor (Revocation service)
+   - Verify TSL signature using validated certificate
+   - Check bit at `status.status_list.index`: 0 = valid, 1 = revoked
+   - Three-step process: PKIX + TSL signature + bit check
+   - **Note:** For mDoc-encoded PID, follow ISO/IEC 18013-5 2nd edition (TBD)
+
+5. **Wallet Token Status List Validation (Revocation Service) - for WUA**
+   - Extract `status.status_list.uri` and `status.status_list.index` from WUA payload
+   - Fetch Token Status List (JWT) from URI
+   - Extract certificate chain from TSL `x5c`
+   - Build path from TSL `x5c` end-entity to LoTE trust anchor (Revocation service)
+   - Verify TSL signature using validated certificate
+   - Check bit at `status.status_list.index`: 0 = valid, 1 = revoked
+   - Three-step process: PKIX + TSL signature + bit check
+   - **Note:** WIA revocation mechanism TBD
 
 #### IG.2.2 For WRPAC and WRPRC Providers
 
@@ -1593,6 +2037,7 @@ If you encounter issues or ambiguities in implementation:
 ### ETSI Specifications
 
 - **ETSI TS 119 412-6 V1.1.1**: "Certificate profile requirements for PID, Wallet, EAA, QEAA, and PSBEAA providers"
+- **ETSI TS 119 472-3**: "PID attestation issuance" (profiles HAIP v1 for PID)
 - **ETSI TS 119 475 V1.2.1**: "Relying party attributes supporting EUDI Wallet user's authorization decisions"
 - **ETSI TS 119 602 V1.1.1**: "Lists of trusted entities; Data model"
 - **ETSI TS 119 612 V2.4.1**: "Trusted Lists" (August 2025)¹
@@ -1607,6 +2052,15 @@ affecting the certificate validation analysis. V2.4.1 is a maintenance release w
 Wallet provider lists are defined in ETSI TS 119 602, not TS 119 612. See `TS119612-Version-Comparison.md` for detailed
 analysis.
 
+### OIDF Specifications
+
+- **OpenID4VC High Assurance Interoperability Profile 1.0 (HAIP v1)**: "OpenID4VC High Assurance Interoperability Profile 1.0" (openid4vc-high-assurance-interoperability-profile-1_0)
+  - Profiles OpenID4VCI, OpenID4VP, SD-JWT-VC, and ISO mdoc for high assurance use cases
+  - Requires Token Status List for SD-JWT-VC revocation
+  - References ISO/IEC 18013-5 2nd edition for mdoc revocation
+- **OpenID for Verifiable Credential Issuance 1.0 (OID4VCI)**: "OpenID for Verifiable Credential Issuance 1.0"
+- **OpenID for Verifiable Presentations 1.0 (OID4VP)**: "OpenID for Verifiable Presentations 1.0"
+
 ### IETF RFCs
 
 - **RFC 5280**: "Internet X.509 Public Key Infrastructure Certificate and CRL Profile"
@@ -1616,6 +2070,13 @@ analysis.
 ### IETF Internet-Drafts
 
 - **draft-ietf-oauth-status-list**: Looker, T., Bastian, P., and C. Bormann, "Token Status List (TSL)", Work in Progress, Internet-Draft, draft-ietf-oauth-status-list-18, 18 February 2026, <https://datatracker.ietf.org/doc/html/draft-ietf-oauth-status-list-18>
+
+### ISO/IEC Standards
+
+- **ISO/IEC 18013-5 (2nd edition)**: "Personal identification — ISO-compliant driving licence — Part 5: Mobile driving licence (mDL) applications" (unpublished, in development)
+  - Defines mDoc format for mobile driving licences
+  - Specifies revocation mechanisms including Token Status List and List Identifiers
+  - Referenced for PID attestation in mDoc format
 
 ---
 
