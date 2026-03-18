@@ -20,9 +20,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
 # Define module paths, Gradle project names, and their framework names
-MODULE_PATHS=("consultation" "119602-data-model" "119602-consultation")
-GRADLE_PROJECTS=("etsi-1196x2-consultation" "etsi-119602-data-model" "etsi-119602-consultation")
-FRAMEWORK_NAMES=("etsi_1196x2_consultation" "etsi_119602_data_model" "etsi_119602_consultation")
+MODULE_PATHS=("consultation" "119602-data-model" "119602-consultation" "1196x2-signum")
+GRADLE_PROJECTS=("etsi-1196x2-consultation" "etsi-119602-data-model" "etsi-119602-consultation" "etsi-1196x2-signum")
+FRAMEWORK_NAMES=("etsi_1196x2_consultation" "etsi_119602_data_model" "etsi_119602_consultation" "etsi_1196x2_signum")
 
 # Define iOS targets (capitalized for Gradle task names)
 GRADLE_TARGETS=("IosArm64" "IosX64" "IosSimulatorArm64")
@@ -54,7 +54,8 @@ for i in "${!GRADLE_TARGETS[@]}"; do
     ./gradlew \
         :etsi-1196x2-consultation:linkDebugFramework${gradle_target} \
         :etsi-119602-data-model:linkDebugFramework${gradle_target} \
-        :etsi-119602-consultation:linkDebugFramework${gradle_target}
+        :etsi-119602-consultation:linkDebugFramework${gradle_target} \
+        :etsi-1196x2-signum:linkDebugFramework${gradle_target}
     echo ""
 done
 
