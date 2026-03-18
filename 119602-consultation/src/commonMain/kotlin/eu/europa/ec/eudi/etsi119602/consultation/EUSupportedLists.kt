@@ -49,7 +49,7 @@ public fun SupportedLists.Companion.eu(): SupportedLists<LotEMeta<VerificationCo
 
         wrprcProviders = UseCase.WRPC.loteMeta(
             issuance = setOf(VerificationContext.WalletRelyingPartyRegistrationCertificate),
-            revocation = emptySet(),
+            revocation = setOf(VerificationContext.WalletRelyingPartyRegistrationCertificateStatus),
         ),
         pubEaaProviders = null,
         qeaProviders = null,
