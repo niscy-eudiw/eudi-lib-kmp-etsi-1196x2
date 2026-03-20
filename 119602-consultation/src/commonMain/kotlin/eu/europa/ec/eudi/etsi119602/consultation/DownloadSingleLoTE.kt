@@ -25,11 +25,13 @@ import io.ktor.http.*
 /**
  * Loads a List of Trusted Entities (LoTE) JWT from a remote HTTP endpoint.
  *
- * @param httpClient the Ktor HTTP client to use for requests
+ * @param httpClient the Ktor HTTP client to use for requests. Defaults to a pre-configured client with JSON support.
  */
 public class DownloadSingleLoTE(
     private val httpClient: HttpClient,
 ) : LoadLoTE<String> {
+
+    public constructor() : this(createHttpClient())
 
     override suspend fun invoke(uri: URI): LoadLoTE.Outcome<String> {
         val httpResponse = httpClient.get(uri) { expectSuccess = false }

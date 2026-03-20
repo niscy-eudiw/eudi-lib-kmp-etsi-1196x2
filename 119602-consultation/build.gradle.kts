@@ -109,6 +109,8 @@ kotlin {
                 implementation(libs.atomicfu)
                 implementation(libs.kotlinx.io.core)
                 api(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.json)
             }
         }
 
