@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.etsi119602.consultation.ETSI119411.NCP_L_EUDIWRP
 import eu.europa.ec.eudi.etsi119602.consultation.ETSI119411.NCP_N_EUDIWRP
 import eu.europa.ec.eudi.etsi119602.consultation.ETSI119411.QCP_L_EUDIWRP
 import eu.europa.ec.eudi.etsi119602.consultation.ETSI119411.QCP_N_EUDIWRP
+import eu.europa.ec.eudi.etsi119602.consultation.ETSI319412
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.*
 import kotlin.time.Instant
 
@@ -130,11 +131,22 @@ public fun wrpAccessCertificateProfile(
             allowedPolicies
         }
 
+    // Determine if we are requiring a QCP policy (only when a specific policy is set)
+    val isQcp = policy != null && (policy == QCP_N_EUDIWRP || policy == QCP_L_EUDIWRP)
+
     return certificateProfile {
         requireEndEntityCertificate()
         requireDigitalSignature()
         requireValidAt(at)
         requirePolicy(policies)
         requireNoSelfSigned()
+        requireAiaForCaIssued()
+        if (isQcp) {
+            requireQcStatement(ETSI319412.QC_COMPLIANCE) // QcCompliance
+            requireQcStatement(ETSI319412.QC_SSCD) // QcSSCD
+            if (policy == QCP_L_EUDIWRP) {
+                requireQcStatement(ETSI319412.QC_TYPE) // QcType
+            }
+        }
     }
 }
