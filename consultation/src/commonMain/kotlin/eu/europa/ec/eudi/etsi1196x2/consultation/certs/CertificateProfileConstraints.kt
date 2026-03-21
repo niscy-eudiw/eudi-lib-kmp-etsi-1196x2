@@ -35,6 +35,7 @@ public fun ProfileBuilder.requireEndEntityCertificate() {
     }
 }
 
+
 /**
  * Requires the certificate to be a CA certificate (cA=TRUE) with the optional path length constraint.
  *
@@ -217,11 +218,13 @@ public fun ProfileBuilder.requirePolicyPresence() {
  * Self-signed certificates (trust anchors) are exempt from this requirement.
  */
 public fun ProfileBuilder.requireAiaForCaIssued() {
-    aiaWithSelfSigned { aiaWithSelfSigned ->
+    combine(
+        CertificateOperationsAlgebra.GetAia,
+        CertificateOperationsAlgebra.CheckSelfSigned,
+    ) { (aia, isSelfSigned) ->
         evaluation {
             // Only check AIA for non-self-signed certificates
-            if (!aiaWithSelfSigned.isSelfSigned) {
-                val aia = aiaWithSelfSigned.aia
+            if (!isSelfSigned) {
                 if (aia == null) {
                     add(Violations.caIssuedCertificateMissingAiaExtension)
                 } else if (aia.caIssuersUri == null) {
@@ -316,33 +319,66 @@ public fun ProfileBuilder.requirePositiveSerialNumber() {
  * - serialNumber (optional attribute, not to be confused with certificate serial number)
  */
 public fun ProfileBuilder.requireSubjectNaturalPersonAttributes() {
-    subject { subject ->
-        evaluation {
-            if (subject == null) {
-                add(Violations.missingSubjectDistinguishedName)
-                return@evaluation
-            }
+    subject { subject -> evaluateSubjectNaturalPersonAttributes(subject) }
+}
 
-            // countryName is mandatory
-            if (subject.countryName.isNullOrBlank()) {
-                add(Violations.subjectMissingCountryName)
-            }
+public fun evaluateSubjectNaturalPersonAttributes(
+    subject: DistinguishedName?,
+): CertificateConstraintEvaluation =
+    evaluation {
+        if (subject == null) {
+            add(Violations.missingSubjectDistinguishedName)
+            return@evaluation
+        }
 
-            // givenName, surname, or pseudonym is mandatory
-            val hasName = !subject.givenName.isNullOrBlank() ||
-                !subject.surname.isNullOrBlank() ||
-                !subject.pseudonym.isNullOrBlank()
-            if (!hasName) {
-                add(Violations.subjectMissingPersonalName)
-            }
+        // countryName is mandatory
+        if (subject.countryName.isNullOrBlank()) {
+            add(Violations.subjectMissingCountryName)
+        }
 
-            // commonName is mandatory
-            if (subject.commonName.isNullOrBlank()) {
-                add(Violations.subjectMissingCommonName)
-            }
+        // givenName, surname, or pseudonym is mandatory
+        val hasName = !subject.givenName.isNullOrBlank() ||
+            !subject.surname.isNullOrBlank() ||
+            !subject.pseudonym.isNullOrBlank()
+        if (!hasName) {
+            add(Violations.subjectMissingPersonalName)
+        }
+
+        // commonName is mandatory
+        if (subject.commonName.isNullOrBlank()) {
+            add(Violations.subjectMissingCommonName)
         }
     }
-}
+
+public fun evaluateSubjectLegalPersonAttributes(
+    subject: DistinguishedName?,
+): CertificateConstraintEvaluation =
+    evaluation {
+        if (subject == null) {
+            add(Violations.missingSubjectDistinguishedName)
+            return@evaluation
+        }
+
+        // countryName is mandatory
+        if (subject.countryName.isNullOrBlank()) {
+            add(Violations.subjectMissingCountryName)
+        }
+
+        // organizationName is mandatory
+        if (subject.organizationName.isNullOrBlank()) {
+            add(Violations.subjectMissingOrganizationName)
+        }
+
+        // organizationIdentifier is mandatory
+        if (subject.organizationIdentifier.isNullOrBlank()) {
+            add(Violations.subjectMissingOrganizationIdentifier)
+        }
+
+        // commonName is mandatory
+        if (subject.commonName.isNullOrBlank()) {
+            add(Violations.subjectMissingCommonName)
+        }
+    }
 
 /**
  * Requires the subject DN to contain attributes for a legal person
@@ -355,34 +391,7 @@ public fun ProfileBuilder.requireSubjectNaturalPersonAttributes() {
  * - commonName (CN)
  */
 public fun ProfileBuilder.requireSubjectLegalPersonAttributes() {
-    subject { subject ->
-        evaluation {
-            if (subject == null) {
-                add(Violations.missingSubjectDistinguishedName)
-                return@evaluation
-            }
-
-            // countryName is mandatory
-            if (subject.countryName.isNullOrBlank()) {
-                add(Violations.subjectMissingCountryName)
-            }
-
-            // organizationName is mandatory
-            if (subject.organizationName.isNullOrBlank()) {
-                add(Violations.subjectMissingOrganizationName)
-            }
-
-            // organizationIdentifier is mandatory
-            if (subject.organizationIdentifier.isNullOrBlank()) {
-                add(Violations.subjectMissingOrganizationIdentifier)
-            }
-
-            // commonName is mandatory
-            if (subject.commonName.isNullOrBlank()) {
-                add(Violations.subjectMissingCommonName)
-            }
-        }
-    }
+    subject { subject -> evaluateSubjectLegalPersonAttributes(subject) }
 }
 
 /**
@@ -462,7 +471,11 @@ public fun ProfileBuilder.requireAuthorityKeyIdentifier() {
  * Per ETSI EN 319 412-2 clause 4.3.11, CRLDP is conditionally required.
  */
 public fun ProfileBuilder.requireCrlDistributionPointsIfNoOcspAndNotValAssured() {
-    crlDistributionPointsWithAiaAndQcStatements { (crldp, aia, qcStatements) ->
+    combine(
+        CertificateOperationsAlgebra.GetCrlDistributionPoints,
+        CertificateOperationsAlgebra.GetAia,
+        CertificateOperationsAlgebra.GetAllQcStatements,
+    ) { (crldp, aia, qcStatements) ->
         evaluation {
             // Exempt if OCSP responder is present in AIA
             val hasOcsp = aia?.ocspUri != null
@@ -520,7 +533,10 @@ public fun ProfileBuilder.requireCrlDistributionPoints() {
  * @param rules a function mapping a policy OID to the list of required QC statement OIDs
  */
 public fun ProfileBuilder.requireQcStatementsForPolicy(rules: (String) -> List<String>) {
-    policiesWithQcStatements { (policies, qcStatements) ->
+    combine(
+        CertificateOperationsAlgebra.GetPolicies,
+        CertificateOperationsAlgebra.GetAllQcStatements,
+    ) { (policies, qcStatements) ->
         evaluation {
             val requiredQcTypes = policies
                 .flatMap { rules(it) }

@@ -122,6 +122,9 @@ public fun wrpAccessCertificateProfile(
             else -> emptyList()
         }
     }
+
+    // Subject DN attributes required based on certificate policy (natural person vs legal person)
+    requireSubjectNameForWRPAC()
 }
 
 /**
@@ -153,6 +156,33 @@ public fun ProfileBuilder.requireSubjectAltNameForWRPAC() {
 
             if (!hasContactInfo) {
                 add(subjectAltNameMissingContactInfo)
+            }
+        }
+    }
+}
+
+/**
+ * Requires the subject DN attributes based on the certificate policy (natural person vs legal person).
+ *
+ * Per ETSI TS 119 411-8 and ETSI EN 319 412-2/3:
+ * - Natural person certificates (NCP-n, QCP-n) MUST contain: countryName, givenName/surname/pseudonym,
+ *   commonName, and serialNumber
+ * - Legal person certificates (NCP-l, QCP-l) MUST contain: countryName, organizationName,
+ *   organizationIdentifier, and commonName
+ *
+ * The certificate policy OID determines which set of attributes is required.
+ */
+internal fun ProfileBuilder.requireSubjectNameForWRPAC() {
+    combine(
+        CertificateOperationsAlgebra.GetPolicies,
+        CertificateOperationsAlgebra.GetSubject,
+    ) { (policies, subject) ->
+        evaluation {
+            val isNaturalPerson = policies.any { it in listOf(NCP_N_EUDIWRP, QCP_N_EUDIWRP) }
+            val isLegalPerson = policies.any { it in listOf(NCP_L_EUDIWRP, QCP_L_EUDIWRP) }
+            when {
+                isNaturalPerson -> evaluateSubjectNaturalPersonAttributes(subject)
+                isLegalPerson -> evaluateSubjectLegalPersonAttributes(subject)
             }
         }
     }

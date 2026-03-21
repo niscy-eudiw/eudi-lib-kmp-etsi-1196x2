@@ -78,14 +78,6 @@ public sealed interface CertificateOperationsAlgebra<out T> {
     public data object GetAia : CertificateOperationsAlgebra<AuthorityInformationAccess?>
 
     /**
-     * Extract AIA extension combined with self-signed status.
-     *
-     * This operation is used for validating AIA requirements that only apply
-     * to CA-issued (non-self-signed) certificates.
-     */
-    public data object GetAiaWithSelfSigned : CertificateOperationsAlgebra<AiaWithSelfSigned>
-
-    /**
      * Extract QCStatements of a specific type (ETSI EN 319 412-5).
      *
      * @param qcType the OID identifying the QC type (e.g., "0.4.0.194126.1.1" for id-etsi-qct-pid)
@@ -218,19 +210,6 @@ public data class ValidityPeriod(
 public data class AuthorityInformationAccess(
     val caIssuersUri: String?,
     val ocspUri: String?,
-)
-
-/**
- * Information about AIA extension combined with self-signed status.
- *
- * Used for validating AIA requirements that only apply to CA-issued (non-self-signed) certificates.
- *
- * @param isSelfSigned whether the certificate is self-signed
- * @param aia the AIA extension content (null if not present)
- */
-public data class AiaWithSelfSigned(
-    val isSelfSigned: Boolean,
-    val aia: AuthorityInformationAccess?,
 )
 
 // TODO Remove "magic" values

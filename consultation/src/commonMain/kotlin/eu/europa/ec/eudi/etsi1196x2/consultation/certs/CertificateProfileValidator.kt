@@ -140,12 +140,6 @@ public interface CertificateProfileInterpreter<CERT : Any> {
                         is CertificateOperationsAlgebra.GetAia ->
                             operations.getAiaExtension(certificate) as T
 
-                        is CertificateOperationsAlgebra.GetAiaWithSelfSigned ->
-                            AiaWithSelfSigned(
-                                isSelfSigned = operations.isSelfSigned(certificate),
-                                aia = operations.getAiaExtension(certificate),
-                            ) as T
-
                         is CertificateOperationsAlgebra.GetQcStatements ->
                             operations.getQcStatements(certificate)
                                 .filter { it.qcType == op.qcType } as T
@@ -200,7 +194,7 @@ private class DefaultCertificateValidator<CERT : Any>(
         constraint: CertificateConstraint<T>,
         certificate: CERT,
     ): CertificateConstraintEvaluation =
-        constraint.validate(interpreter.interpret(constraint.op, certificate))
+        constraint.evaluate(interpreter.interpret(constraint.op, certificate))
 
     override suspend fun validate(
         profile: CertificateProfile,
