@@ -178,10 +178,11 @@ public interface CertificateProfileInterpreter<CERT : Any> {
                         is CertificateOperationsAlgebra.GetAllQcStatements ->
                             operations.getQcStatements(certificate) as T
 
-                        is CertificateOperationsAlgebra.GetCombined<*, *> -> {
+                        is CertificateOperationsAlgebra.GetCombined<*, *, *> -> {
                             val a = interpret(op.first, certificate)
                             val b = interpret(op.second, certificate)
-                            (a to b) as T
+                            @Suppress("UNCHECKED_CAST")
+                            (op.combine as (Any?, Any?) -> T)(a, b)
                         }
                     }
                 }

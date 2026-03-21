@@ -455,11 +455,6 @@ public fun ProfileBuilder.requireAuthorityKeyIdentifier() {
     }
 }
 
-// TODO This is not complete
-//
-// CRL Distribution Points Constraints
-//
-
 /**
  * Requires CRL Distribution Points if the certificate does not have an OCSP responder
  * in AIA and is not a short-term certificate with validity-assured extension.
@@ -467,26 +462,22 @@ public fun ProfileBuilder.requireAuthorityKeyIdentifier() {
  * Per ETSI EN 319 412-2 clause 4.3.11, CRLDP is conditionally required.
  */
 public fun ProfileBuilder.requireCrlDistributionPointsIfNoOcspAndNotValAssured() {
-    // This constraint requires access to both CRLDP and AIA, so we need to check them separately
-    // and combine the logic. For now, we'll check CRLDP presence only.
-    // A more sophisticated implementation would require cross-extension validation.
-    crlDistributionPoints { crldp ->
+    crlDistributionPointsWithAiaAndQcStatements { (crldp, aia, qcStatements) ->
         evaluation {
-            // Note: Full implementation would also check AIA for OCSP
-            // For now, just require CRLDP to be present if it exists
-            // The actual conditional logic requires a more complex validator
-            if (crldp.isEmpty()) {
-                // Don't fail here - the actual check requires AIA too
-                // This is a placeholder that passes silently
-                // Real implementation would need cross-extension access
+            // Exempt if OCSP responder is present in AIA
+            val hasOcsp = aia?.ocspUri != null
+            if (hasOcsp) return@evaluation
+
+            // Exempt if validity-assured short-term certificate QC statement is present
+            val isValAssured = qcStatements.any {
+                it.qcType == ETSI319412Part1.EXT_ETSI_VAL_ASSURED_ST_CERTS
             }
-        }
-    }
-    // Also require AIA to be present (which typically contains OCSP)
-    aia { aia ->
-        evaluation {
-            // AIA presence is already checked elsewhere
-            // This is just for the combined CRLDP/OCSP logic
+            if (isValAssured) return@evaluation
+
+            // Otherwise, CRLDP must be present with at least one valid URI
+            if (crldp.isEmpty() || crldp.all { it.distributionPointUri.isNullOrBlank() }) {
+                add(Violations.missingCrlDistributionPointsWhenNoOcsp)
+            }
         }
     }
 }

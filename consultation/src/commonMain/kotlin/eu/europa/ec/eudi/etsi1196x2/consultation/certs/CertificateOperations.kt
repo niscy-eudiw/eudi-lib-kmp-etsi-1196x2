@@ -139,21 +139,11 @@ public sealed interface CertificateOperationsAlgebra<out T> {
      */
     public data object GetAllQcStatements : CertificateOperationsAlgebra<List<QCStatementInfo>>
 
-    /**
-     * Combine two algebra operations into a single operation returning a [Pair] of their results.
-     *
-     * This is a product type in the algebra, allowing any two existing operations to be composed
-     * without adding new dedicated algebra types or interpreter branches.
-     *
-     * @param A the result type of the first operation
-     * @param B the result type of the second operation
-     * @param first the first operation
-     * @param second the second operation
-     */
-    public data class GetCombined<A, B>(
+    public data class GetCombined<A, B, out C>(
         val first: CertificateOperationsAlgebra<A>,
         val second: CertificateOperationsAlgebra<B>,
-    ) : CertificateOperationsAlgebra<Pair<A, B>>
+        val combine: (A, B) -> C,
+    ) : CertificateOperationsAlgebra<C>
 }
 
 /**
@@ -416,7 +406,7 @@ public data class PublicKeyAlgorithmOptions(
         val algorithm: String,
         val minimumKeySize: Int,
 
-    ) {
+        ) {
         public companion object {
             public val RSA_2048: AlgorithmRequirement get() = AlgorithmRequirement("RSA", 2048)
             public val EC_256: AlgorithmRequirement get() = AlgorithmRequirement("EC", 256)

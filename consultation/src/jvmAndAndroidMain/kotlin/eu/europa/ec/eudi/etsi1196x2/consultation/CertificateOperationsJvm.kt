@@ -399,8 +399,6 @@ public object CertificateOperationsJvm : CertificateOperations<X509Certificate> 
 
     /**
      * Helper function to parse CRL Distribution Points from DER-encoded extension value.
-     * Note: Full URI extraction requires detailed BouncyCastle ASN.1 parsing.
-     * This implementation confirms CRLDP presence but may not extract URIs correctly.
      */
     private fun ByteArray.parseCrlDistributionPoints(): List<CrlDistributionPoint> = try {
         ASN1InputStream(this).use { asn1InputStream ->
@@ -410,14 +408,17 @@ public object CertificateOperationsJvm : CertificateOperations<X509Certificate> 
 
             val dps = crlDistPoint.distributionPoints ?: return emptyList()
 
-            // Simplified: just confirm CRLDP is present
-            // Full implementation would iterate through DistributionPoints and extract URIs
             dps.mapNotNull { dp ->
-                if (dp != null) {
-                    CrlDistributionPoint(null, null)
-                } else {
-                    null
+                if (dp == null) return@mapNotNull null
+                val dpName = dp.distributionPoint
+                var uri: String? = null
+                if (dpName != null && dpName.type == org.bouncycastle.asn1.x509.DistributionPointName.FULL_NAME) {
+                    val generalNames = org.bouncycastle.asn1.x509.GeneralNames.getInstance(dpName.name)
+                    uri = generalNames.names
+                        .firstOrNull { it.tagNo == GeneralName.uniformResourceIdentifier }
+                        ?.name?.toString()
                 }
+                CrlDistributionPoint(uri, null)
             }
         }
     } catch (e: Exception) {

@@ -160,6 +160,7 @@ public class ProfileBuilder {
             CertificateOperationsAlgebra.GetCombined(
                 CertificateOperationsAlgebra.GetAia,
                 CertificateOperationsAlgebra.CheckSelfSigned,
+                ::Pair,
             ),
         ) { (aia, isSelfSigned) -> check(AiaWithSelfSigned(isSelfSigned = isSelfSigned, aia = aia)) }
     }
@@ -177,6 +178,7 @@ public class ProfileBuilder {
             CertificateOperationsAlgebra.GetCombined(
                 CertificateOperationsAlgebra.GetPolicies,
                 CertificateOperationsAlgebra.GetAllQcStatements,
+                ::Pair,
             ),
             check,
         )
@@ -228,6 +230,27 @@ public class ProfileBuilder {
         check: (List<CrlDistributionPoint>) -> CertificateConstraintEvaluation,
     ) {
         requirements += CertificateConstraint(CertificateOperationsAlgebra.GetCrlDistributionPoints, check)
+    }
+
+    /**
+     * Defines a constraint that has access to CRL Distribution Points, AIA, and all QC statements.
+     *
+     * Used for conditional CRLDP validation per ETSI EN 319 412-2 clause 4.3.11.
+     */
+    public fun crlDistributionPointsWithAiaAndQcStatements(
+        check: (Triple<List<CrlDistributionPoint>, AuthorityInformationAccess?, List<QCStatementInfo>>) -> CertificateConstraintEvaluation,
+    ) {
+        requirements += CertificateConstraint(
+            op = CertificateOperationsAlgebra.GetCombined(
+                first = CertificateOperationsAlgebra.GetCombined(
+                    CertificateOperationsAlgebra.GetCrlDistributionPoints,
+                    CertificateOperationsAlgebra.GetAia,
+                    ::Pair,
+                ),
+                second = CertificateOperationsAlgebra.GetAllQcStatements,
+            ) { (dp, aia), qcStatements -> Triple(dp, aia, qcStatements) },
+            check,
+        )
     }
 
     /**

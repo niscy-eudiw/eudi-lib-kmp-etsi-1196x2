@@ -125,6 +125,7 @@ object CertOps {
         policyOids: List<String>? = listOf("0.4.0.194118.1.1"), // Default: NCP-n-eudiwrp
         caIssuersUri: String? = "http://ca.example.com/ca.crt",
         ocspUri: String? = "http://ocsp.example.com/",
+        crlDistributionPointUri: String? = null,
         subjectAltNameUri: String? = "https://wallet-relying-party.example.com",
         subjectKeyPairAlg: String = "EC",
         subjectKeySize: Int? = null,
@@ -141,6 +142,7 @@ object CertOps {
             policyOids,
             caIssuersUri,
             ocspUri,
+            crlDistributionPointUri,
             subjectAltNameUri,
         )
         return eeKp to eeCertHolder
@@ -217,6 +219,7 @@ object CertOps {
         policyOids: List<String>? = null,
         caIssuersUri: String? = null,
         ocspUri: String? = null,
+        crlDistributionPointUri: String? = null,
         subjectAltNameUri: String? = null,
     ): X509CertificateHolder =
         JcaX509v3CertificateBuilder(
@@ -245,6 +248,9 @@ object CertOps {
             }
             certificatePolicies(policyOids ?: listOf())
             authorityInformationAccess(caIssuersUri, ocspUri)
+            if (crlDistributionPointUri != null) {
+                crlDistributionPoints(crlDistributionPointUri)
+            }
             if (subjectAltNameUri != null) {
                 subjectAlternativeName(subjectAltNameUri)
             }
@@ -341,12 +347,21 @@ private fun JcaX509v3CertificateBuilder.authorityInformationAccess(
 }
 
 /**
- * Adds a Subject Alternative Name extension with a URI.
+ * Adds a CRL Distribution Points extension to the certificate.
  *
- * @param uri the URI to add to the SAN extension
+ * @param uri the URI of the CRL distribution point
  *
- * @see [RFC 5280 Section 4.2.1.6](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.6)
+ * @see [RFC 5280 Section 4.2.1.13](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13)
  */
+private fun JcaX509v3CertificateBuilder.crlDistributionPoints(uri: String) {
+    val dpName = DistributionPointName(
+        DistributionPointName.FULL_NAME,
+        GeneralNames(GeneralName(GeneralName.uniformResourceIdentifier, DERIA5String(uri))),
+    )
+    val dp = DistributionPoint(dpName, null, null)
+    addExtension(Extension.cRLDistributionPoints, false, CRLDistPoint(arrayOf(dp)))
+}
+
 private fun JcaX509v3CertificateBuilder.subjectAlternativeName(uri: String) {
     val generalName = GeneralName(GeneralName.uniformResourceIdentifier, DERIA5String(uri))
     addExtension(Extension.subjectAlternativeName, false, DERSequence(arrayOf(generalName)))

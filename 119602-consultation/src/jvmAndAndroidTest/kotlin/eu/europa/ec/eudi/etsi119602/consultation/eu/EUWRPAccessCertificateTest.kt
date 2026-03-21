@@ -56,6 +56,7 @@ class EUWRPAccessCertificateTest {
         policyOids: List<String>? = listOf("0.4.0.194118.1.1"), // Default: NCP-n-eudiwrp
         caIssuersUri: String? = "http://ca.example.com/ca.crt",
         ocspUri: String? = "http://ocsp.example.com/",
+        crlDistributionPointUri: String? = null,
     ): X509Certificate {
         val (caKeyPair, caCert) = wrpacProvider
         val (_, certHolder) = CertOps.genCAIssuedEndEntityCertificate(
@@ -67,6 +68,7 @@ class EUWRPAccessCertificateTest {
             policyOids = policyOids,
             caIssuersUri = caIssuersUri,
             ocspUri = ocspUri,
+            crlDistributionPointUri = crlDistributionPointUri,
         )
         return certHolder.toX509Certificate()
     }
@@ -194,8 +196,9 @@ class EUWRPAccessCertificateTest {
         val certificate = genCAIssuedEndEntityCertificate(
             subject = legalPersonSubject,
             policyOids = listOf(ETSI119411Part8.NCP_N_EUDIWRP),
-            caIssuersUri = null, // Only missing attribute
+            caIssuersUri = null,
             ocspUri = null,
+            crlDistributionPointUri = "http://crl.example.com/crl.crl", // present so only AIA violation fires
         )
         val evaluation = evaluateEndEntityCertificateConstraints(certificate)
         assertFalse(evaluation.isMet())
