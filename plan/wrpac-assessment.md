@@ -14,16 +14,18 @@
 |         |            |                  | validation now fully implemented. Score improved from 7/10 to 8/10.                               |
 | 5.0     | 2026-03-21 | Assessment Agent | File reorganization: wrpAccessCertificateProfile moved to EUWRPAccessCertificate.kt.              |
 |         |            |                  | No functional changes, code reorganization only.                                                  |
+| 6.0     | 2026-03-21 | Assessment Agent | Issuer DN validation implemented: WRPAC Provider CA always validated as legal person.             |
+|         |            |                  | Score improved from 8/10 to 9/10.                                                                 |
 
 ---
 
 ## Executive Summary
 
-The `wrpAccessCertificateProfile` function in `EUWRPACProvidersList.kt` has been **significantly enhanced** and now
+The `wrpAccessCertificateProfile` function in `EUWRPAccessCertificate.kt` has been **significantly enhanced** and now
 provides a **comprehensive subset** of ETSI TS 119 411-8 requirements. The implementation demonstrates **strong
 structural alignment** with most critical infrastructure components in place.
 
-**Overall Compliance Score: 8/10** (+1 from version 3.0)
+**Overall Compliance Score: 9/10** (+1 from version 5.0)
 
 **Key Findings:**
 
@@ -38,8 +40,9 @@ structural alignment** with most critical infrastructure components in place.
 - ✅ CRLDistributionPoints conditional validation (if no OCSP and not val-assured) implemented
 - ✅ Public key algorithm/size validation (RSA 2048+, EC 256+) implemented
 - ✅ Policy-conditional QCStatements using `requireQcStatementsForPolicy` implemented
-- ✅ **Subject DN attribute validation for natural person and legal person certificates implemented**
-- ⚠️ **Still missing ~20%** of ETSI mandatory requirements, primarily issuer DN attribute validation
+- ✅ Subject DN attribute validation for natural person and legal person certificates implemented
+- ✅ **Issuer DN attribute validation implemented (WRPAC Provider CA always validated as legal person)**
+- ⚠️ **Still missing ~10%** of ETSI mandatory requirements, primarily extension criticality and organizationIdentifier format validation
 - ⚠️ Extension criticality validation not yet implemented (KeyUsage, CertificatePolicies should be critical)
 
 ---
@@ -134,6 +137,7 @@ public fun wrpAccessCertificateProfile(
 | QCStatement: QcType (QCP-l only)    | EN 319 412-5 4.2.3      | `requireQcStatementsForPolicy`                           | ✅      |
 | Subject DN: Natural person attrs    | EN 319 412-2 4.2.2      | `requireSubjectNameForWRPAC()` → `evaluateSubjectNaturalPersonAttributes()` | ✅      |
 | Subject DN: Legal person attrs      | EN 319 412-3 4.2.1      | `requireSubjectNameForWRPAC()` → `evaluateSubjectLegalPersonAttributes()` | ✅      |
+| Issuer DN: Legal person attrs       | EN 319 412-3 4.2.3      | `requireIssuerLegalPersonAttributes()`                   | ✅      |
 
 ### Missing Requirements ✗
 
@@ -142,7 +146,7 @@ public fun wrpAccessCertificateProfile(
 | **Certificate Fields**            |
 | version = V3                      | RFC 5280 4.1.2.1                      | ✅      |                                                       |
 | serialNumber (unique positive)    | RFC 5280 4.1.2.2                      | ✅      |                                                       |
-| issuer attributes                 | EN 319 412-2/3 4.2.3                  | ❌      | No issuer DN extraction/validation                    |
+| issuer attributes                 | EN 319 412-2/3 4.2.3                  | ✅      | **Now implemented (legal person)**                    |
 | subject attributes                | EN 319 412-2/3 4.2.4                  | ✅      | **Now implemented**                                   |
 | subjectPublicKeyInfo              | TS 119 312                            | ✅      |                                                       |
 | **Extensions**                    |
@@ -217,10 +221,10 @@ extraction, and policy-specific constraints have been fully implemented.
 
 - **Natural Person Subject**: countryName, givenName/surname/pseudonym, commonName, serialNumber ✅
 - **Legal Person Subject**: countryName, organizationName, organizationIdentifier, commonName ✅
-- **Natural Person Issuer**: countryName, givenName/surname/pseudonym, commonName, serialNumber ❌
-- **Legal Person Issuer**: countryName, organizationName, commonName, organizationIdentifier (conditional) ❌
+- **Natural Person Issuer**: countryName, givenName/surname/pseudonym, commonName, serialNumber ❌ (not applicable - WRPAC Provider CA is always legal person)
+- **Legal Person Issuer**: countryName, organizationName, commonName, organizationIdentifier ✅ **IMPLEMENTED**
 
-**Impact**: ~~Certificates with incomplete or incorrect subject/issuer names would be accepted.~~ **MITIGATED**: Subject DN validation now enforced. Issuer DN validation still pending.
+**Impact**: ~~Certificates with incomplete or incorrect subject/issuer names would be accepted.~~ **MITIGATED**: Both subject DN and issuer DN validation now enforced.
 
 **Implementation**:
 
@@ -251,8 +255,9 @@ internal fun validateSubjectNameForWRPAC(
 
 - `evaluateSubjectNaturalPersonAttributes()`: Validates countryName, givenName/surname/pseudonym, commonName, serialNumber
 - `evaluateSubjectLegalPersonAttributes()`: Validates countryName, organizationName, organizationIdentifier, commonName
+- `evaluateIssuerLegalPersonAttributes()`: Validates countryName, organizationName, organizationIdentifier, commonName (for WRPAC Provider CA)
 
-**Status**: Subject DN validation **COMPLETE**. Issuer DN validation remains pending.
+**Status**: Subject DN validation **COMPLETE**. Issuer DN validation **COMPLETE** (legal person only, as WRPAC Provider CA is always a legal person under eIDAS).
 
 ---
 
@@ -360,21 +365,21 @@ present.
 
 | Category             | # Requirements | # Compliant | % Compliance |
 |----------------------|----------------|-------------|--------------|
-| Certificate Fields   | 9              | 7           | 78%          |
+| Certificate Fields   | 9              | 8           | 89%          |
 | Extensions           | 13             | 9           | 69%          |
 | Certificate Policies | 4              | 4           | 100%         |
-| Subject Naming       | 7              | 4           | 57%          |
+| Subject Naming       | 7              | 6           | 86%          |
 | Conditional Logic    | 6              | 5           | 83%          |
-| **TOTAL**            | **39**         | **29**      | **74%**      |
+| **TOTAL**            | **39**         | **32**      | **82%**      |
 
-**Overall Compliance Score: 8/10** (+1 from version 3.0)
+**Overall Compliance Score: 9/10** (+1 from version 5.0)
 
 **Breakdown by Implementation Status:**
 
-- ✅ **Fully Implemented (29 requirements)**: Core certificate validation, extensions (AIA, AKI, SAN, CRLDP), public key,
-  QCStatements, **subject DN attributes (natural person & legal person)**
-- ⚠️ **Partially Implemented (5 requirements)**: Extension criticality, validity-assured short-term certs
-- ❌ **Not Implemented (5 requirements)**: Issuer DN attributes, organizationIdentifier format validation, purpose indication
+- ✅ **Fully Implemented (32 requirements)**: Core certificate validation, extensions (AIA, AKI, SAN, CRLDP), public key,
+  QCStatements, **subject DN attributes (natural person & legal person), issuer DN attributes (legal person)**
+- ⚠️ **Partially Implemented (4 requirements)**: Extension criticality, validity-assured short-term certs
+- ❌ **Not Implemented (3 requirements)**: organizationIdentifier format validation, purpose indication, noRevocationAvail
 
 ---
 
@@ -387,15 +392,13 @@ The following constraints remain to be added to `wrpAccessCertificateProfile`:
 1. ✅ **Subject attributes**: **COMPLETED**
     - `requireSubjectNaturalPersonAttributes()` - **DONE**
     - `requireSubjectLegalPersonAttributes()` - **DONE**
-2. ❌ **Issuer attributes**: Infrastructure ready, constraints pending - **PENDING**
-    - `requireIssuerNaturalPersonAttributes()` - **PENDING**
-    - `requireIssuerLegalPersonAttributes()` - **PENDING**
+2. ✅ **Issuer attributes**: **COMPLETED**
+    - `requireIssuerLegalPersonAttributes()` - **DONE** (WRPAC Provider CA is always a legal person)
 3. ❌ **KeyUsage criticality**: `requireCritical("2.5.29.15")` - **PENDING**
 4. ❌ **CertificatePolicies criticality**: `requireCritical("2.5.29.32")` - **PENDING**
 5. ❌ **organizationIdentifier format validation**: Per EN 319 412-3 4.2.1.4 - **PENDING**
 
-**Remaining Work**: Issuer DN attribute validation based on certificate policy (natural person vs legal person),
-extension criticality validation, and organizationIdentifier format validation.
+**Remaining Work**: Extension criticality validation and organizationIdentifier format validation.
 
 ---
 
@@ -538,7 +541,7 @@ Use this checklist to track implementation progress:
 - [x] For QCP-n: QCStatements 1.1, 1.4 present
 - [x] For QCP-l: QCStatements 1.1, 1.4, 1.6 present
 - [x] Subject DN attributes per person type (natural/legal)
-- [ ] Issuer DN attributes per person type
+- [x] Issuer DN attributes (legal person - WRPAC Provider CA)
 - [ ] organizationIdentifier format validation
 - [x] Version = 3 (X.509v3)
 - [x] SerialNumber unique positive integer
@@ -547,7 +550,7 @@ Use this checklist to track implementation progress:
 - [x] Validity-assured and noRevocationAvail for short-term (partial)
 - [ ] Purpose indication (signature vs seal)
 
-**Completion**: 18/23 (78%)
+**Completion**: 19/23 (83%)
 
 ---
 

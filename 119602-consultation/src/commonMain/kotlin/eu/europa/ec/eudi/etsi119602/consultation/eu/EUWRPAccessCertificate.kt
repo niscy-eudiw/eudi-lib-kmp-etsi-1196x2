@@ -76,6 +76,9 @@ public fun wrpAccessCertificateProfile(
 
     // Subject DN attributes required based on certificate policy (natural person vs legal person)
     requireSubjectNameForWRPAC()
+
+    // Issuer DN attributes required (WRPAC Provider CA is always a legal person)
+    requireIssuerLegalPersonAttributes()
 }
 
 internal fun ProfileBuilder.requireSubjectAltNameForWRPAC() =

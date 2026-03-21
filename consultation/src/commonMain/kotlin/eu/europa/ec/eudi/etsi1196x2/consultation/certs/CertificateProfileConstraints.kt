@@ -385,6 +385,49 @@ public fun evaluateSubjectLegalPersonAttributes(
     }
 
 /**
+ * Evaluates the issuer DN to contain attributes for a legal person
+ * per ETSI EN 319 412-3.
+ *
+ * Required attributes:
+ * - countryName (C)
+ * - organizationName (O)
+ * - organizationIdentifier
+ * - commonName (CN)
+ *
+ * This is used for WRPAC Provider CA certificates, which are always
+ * operated by legal persons under eIDAS regulation.
+ */
+public fun evaluateIssuerLegalPersonAttributes(
+    issuer: DistinguishedName?,
+): CertificateConstraintEvaluation =
+    CertificateConstraintEvaluation {
+        if (issuer == null) {
+            add(Violations.missingIssuerDistinguishedName)
+            return@CertificateConstraintEvaluation
+        }
+
+        // countryName is mandatory
+        if (issuer.countryName.isNullOrBlank()) {
+            add(Violations.issuerMissingCountryName)
+        }
+
+        // organizationName is mandatory
+        if (issuer.organizationName.isNullOrBlank()) {
+            add(Violations.issuerMissingOrganizationName)
+        }
+
+        // organizationIdentifier is mandatory
+        if (issuer.organizationIdentifier.isNullOrBlank()) {
+            add(Violations.issuerMissingOrganizationIdentifier)
+        }
+
+        // commonName is mandatory
+        if (issuer.commonName.isNullOrBlank()) {
+            add(Violations.issuerMissingCommonName)
+        }
+    }
+
+/**
  * Requires the subject DN to contain attributes for a legal person
  * per ETSI EN 319 412-3.
  *
@@ -396,6 +439,23 @@ public fun evaluateSubjectLegalPersonAttributes(
  */
 public fun ProfileBuilder.requireSubjectLegalPersonAttributes() {
     subject { subject -> evaluateSubjectLegalPersonAttributes(subject) }
+}
+
+/**
+ * Requires the issuer DN to contain attributes for a legal person
+ * per ETSI EN 319 412-3.
+ *
+ * Required attributes:
+ * - countryName (C)
+ * - organizationName (O)
+ * - organizationIdentifier
+ * - commonName (CN)
+ *
+ * This is used for WRPAC Provider CA certificates, which are always
+ * operated by legal persons under eIDAS regulation.
+ */
+public fun ProfileBuilder.requireIssuerLegalPersonAttributes() {
+    issuer { issuer -> evaluateIssuerLegalPersonAttributes(issuer) }
 }
 
 /**
@@ -741,6 +801,11 @@ internal object Violations {
 
     val issuerMissingCommonName: CertificateConstraintViolation
         get() = CertificateConstraintViolation(reason = "Issuer DN missing required commonName attribute")
+
+    val issuerMissingOrganizationIdentifier: CertificateConstraintViolation
+        get() = CertificateConstraintViolation(
+            reason = "Issuer DN missing required organizationIdentifier attribute (per ETSI EN 319 412-3)",
+        )
 
     // Subject Alternative Name violations
     val missingSubjectAltName: CertificateConstraintViolation

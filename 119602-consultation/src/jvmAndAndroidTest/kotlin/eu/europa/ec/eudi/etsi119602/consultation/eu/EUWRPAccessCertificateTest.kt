@@ -33,14 +33,21 @@ import kotlin.test.assertTrue
 
 class EUWRPAccessCertificateTest {
 
+    private val wrpacProviderName = X500NameBuilder(BCStyle.INSTANCE).apply {
+        addRDN(BCStyle.C, "EU")
+        addRDN(BCStyle.O, "Wallet Relying Party Authority")
+        addRDN(BCStyle.ORGANIZATION_IDENTIFIER, "XXX123")
+        addRDN(BCStyle.CN, "Wallet Relying Party Authority")
+    }.build()
+
     // Subject DN with all required attributes for a legal person (organization)
     // Per ETSI EN 319 412-3: countryName, organizationName, organizationIdentifier, commonName
     private val legalPersonSubject =
         X500NameBuilder(BCStyle.INSTANCE).apply {
             addRDN(BCStyle.C, "EU")
-            addRDN(BCStyle.O, "Wallet Relying Party")
+            addRDN(BCStyle.O, "WRPAC Provider")
             addRDN(BCStyle.ORGANIZATION_IDENTIFIER, "1234567890")
-            addRDN(BCStyle.CN, "Wallet Relying Party")
+            addRDN(BCStyle.CN, "Wallet Relying Party Registry")
         }.build()
 
     // Subject DN with all required attributes for a natural person
@@ -67,9 +74,9 @@ class EUWRPAccessCertificateTest {
     ): CertificateConstraintEvaluation =
         CertificateProfileValidatorJVM.validate(wrpAccessCertificateProfile(), certificate)
 
-    private val wrpacProvider = CertOps.genTrustAnchor(
+    private fun wrpacProvider(subject: X500Name = wrpacProviderName) = CertOps.genTrustAnchor(
         sigAlg = "SHA256withECDSA",
-        subject = X500Name("C=EU,O=Test CA,CN=Test CA"),
+        subject = subject,
         policyOids = null,
         pathLenConstraint = null,
     )
@@ -82,7 +89,7 @@ class EUWRPAccessCertificateTest {
         ocspUri: String? = "http://ocsp.example.com/",
         crlDistributionPointUri: String? = null,
     ): X509Certificate {
-        val (caKeyPair, caCert) = wrpacProvider
+        val (caKeyPair, caCert) = wrpacProvider()
         val (_, certHolder) = CertOps.genCAIssuedEndEntityCertificate(
             signerCert = caCert,
             signerKey = caKeyPair.private,
@@ -110,6 +117,7 @@ class EUWRPAccessCertificateTest {
 
         // Should fail - missing policy OID only
         assertFalse(constraintEvaluation.isMet())
+        constraintEvaluation.violations.forEach { println(it.reason) }
         constraintEvaluation.assertSingleViolation { it.contains("certificate policies", ignoreCase = true) }
     }
 
@@ -262,7 +270,7 @@ class EUWRPAccessCertificateTest {
     @Test
     fun `WRPAC should reject certificate with disallowed public key algorithm`() = runTest {
         // DSA is not an allowed algorithm for WRPAC
-        val (caKeyPair, caCert) = wrpacProvider
+        val (caKeyPair, caCert) = wrpacProvider()
         val (_, certHolder) = CertOps.genCAIssuedEndEntityCertificate(
             signerCert = caCert,
             signerKey = caKeyPair.private,
