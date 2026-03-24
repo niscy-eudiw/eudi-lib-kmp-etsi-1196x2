@@ -25,6 +25,7 @@ structural alignment** with all critical infrastructure components in place.
 - ✅ Issuer DN attribute validation implemented (WRPAC Provider CA always validated as legal person)
 - ✅ organizationIdentifier format validation implemented (EN 319 412-1 clause 5.1.4)
 - ✅ KeyUsage extension criticality validation implemented (RFC 5280 section 4.2.1.3) - `keyUsageDigitalSignature()` validates both digitalSignature bit and critical flag
+- ✅ Extension criticality control implemented (EN 319 412-1 GEN-4.1-2) - only keyUsage and basicConstraints may be critical, all other extensions must be non-critical
 - ✅ "Signing vs Sealing" is **not a certificate-level validation requirement** - WRPACs support both electronic
   signature and electronic seal per ETSI TS 119 475 clause 4.1, this is a policy-level distinction about the
   issuing provider type, not a certificate extension or key usage requirement
@@ -40,21 +41,23 @@ structural alignment** with all critical infrastructure components in place.
 - **Function**: `wrpAccessCertificateProfile()`
 - **Standard**: ETSI TS 119 411-8 (Wallet Relying Party Access Certificate specifications)
 - **Related Standards**: ETSI EN 319 412-1, ETSI EN 319 412-2, ETSI EN 319 412-3, ETSI EN 319 412-5, RFC 5280, RFC 9608
-- **Assessment Date**: 2026-03-22
+- **Assessment Date**: 2026-03-22 (Updated: 2026-03-24 - Extension criticality control implemented per EN 319 412-1 GEN-4.1-2)
 
 ---
 
 ## Current Implementation Analysis
 
-### Function Definition (lines 28-80)
+### Function Definition (lines 28-95)
 
 ```kotlin
 public fun wrpAccessCertificateProfile(
     at: Instant? = null,
+    maxShortTermDuration: Duration = 7.days,
 ): CertificateProfile = certificateProfile {
     // Basic certificate requirements
     endEntity()
     keyUsageDigitalSignature()
+    wrpacExplicitExtensionCriticality()
     validAt(at)
     policyOneOf(NCP_N_EUDIWRP, NCP_L_EUDIWRP, QCP_N_EUDIWRP, QCP_L_EUDIWRP)
     notSelfSigned()
@@ -71,8 +74,11 @@ public fun wrpAccessCertificateProfile(
     // Authority Key Identifier required (EN 319 412-2)
     authorityKeyIdentifier()
 
+    // Validity-assured short-term certificate requirements
+    validityAssuredShortTerm(maxShortTermDuration)
+
     // Subject Alternative Name with contact info required (TS 119 411-8)
-    subjectAltNameForWRPAC()
+    wrpacSubjectAlternativeNames()
 
     // CRL Distribution Points required if no OCSP (EN 319 412-2)
     crlDistributionPointsIfNoOcspAndNotValAssured()
@@ -97,10 +103,24 @@ public fun wrpAccessCertificateProfile(
     }
 
     // Subject DN attributes required based on certificate policy (natural person vs legal person)
-    subjectNameForWRPAC()
+    wrpacSubject()
 
     // Issuer DN attributes required (WRPAC Provider CA is always a legal person)
-    issuerLegalPersonAttributes()
+    issuerLegalPerson()
+}
+
+/**
+ * EN 319 412-1 GEN-4.1-2
+ */
+internal fun ProfileBuilder.wrpacExplicitExtensionCriticality() {
+    fun basicConstraintOrKeyUsage(oid: String) =
+        oid == RFC5280.EXT_BASIC_CONSTRAINTS || oid == RFC5280.EXT_KEY_USAGE
+    extensionCriticality(mustBeCritical = true) { oid ->
+        basicConstraintOrKeyUsage(oid)
+    }
+    extensionCriticality(mustBeCritical = false) { oid ->
+        !basicConstraintOrKeyUsage(oid)
+    }
 }
 ```
 
@@ -119,17 +139,18 @@ public fun wrpAccessCertificateProfile(
 | Serial number (positive)            | RFC 5280 4.1.2.2        | `positiveSerialNumber()`                                 | ✅      |
 | AuthorityInfoAccess                 | EN 319 412-2 4.4.1      | `authorityInformationAccessIfCAIssued()`                 | ✅      |
 | AuthorityKeyIdentifier              | EN 319 412-2 4.3.1      | `authorityKeyIdentifier()`                               | ✅      |
-| SubjectAltName (contact info)       | TS 119 411-8 6.6.1      | `subjectAltNameForWRPAC()`                               | ✅      |
+| SubjectAltName (contact info)       | TS 119 411-8 6.6.1      | `wrpacSubjectAlternativeNames()`                        | ✅      |
 | CRLDistributionPoints (conditional) | EN 319 412-2 4.3.11     | `crlDistributionPointsIfNoOcspAndNotValAssured()`        | ✅      |
 | Public key algorithm/size           | TS 119 312              | `publicKey(options = ...)`                               | ✅      |
 | QCStatement: QcCompliance (QCP)     | EN 319 412-5 4.2.1      | `requireQcStatementsForPolicy`                           | ✅      |
 | QCStatement: QcSSCD (QCP)           | EN 319 412-5 4.2.2      | `requireQcStatementsForPolicy`                           | ✅      |
 | QCStatement: QcType (QCP-l only)    | EN 319 412-5 4.2.3      | `requireQcStatementsForPolicy`                           | ✅      |
-| Subject DN: Natural person attrs    | EN 319 412-2 4.2.2      | `subjectNameForWRPAC()` → `subjectNaturalPersonAttributes()` | ✅      |
-| Subject DN: Legal person attrs      | EN 319 412-3 4.2.1      | `subjectNameForWRPAC()` → `validSubjectLegalPersonAttributes()` | ✅      |
-| Issuer DN: Legal person attrs       | EN 319 412-3 4.2.3      | `issuerLegalPersonAttributes()`                          | ✅      |
+| Subject DN: Natural person attrs    | EN 319 412-2 4.2.2      | `wrpacSubject()` → `naturalPersonDN()`                  | ✅      |
+| Subject DN: Legal person attrs      | EN 319 412-3 4.2.1      | `wrpacSubject()` → `legalPersonDN()`                    | ✅      |
+| Issuer DN: Legal person attrs       | EN 319 412-3 4.2.3      | `issuerLegalPerson()`                                    | ✅      |
 | KeyUsage criticality                | RFC 5280 4.2.1.3        | `requireKeyUsageCritical()`                              | ✅      |
 | organizationIdentifier format       | EN 319 412-1 5.1.4      | `ETSI319412Part1.ORG_ID_PATTERN`                         | ✅      |
+| Extension criticality control       | EN 319 412-1 GEN-4.1-2  | `wrpacExplicitExtensionCriticality()`                    | ✅      |
 
 ### Missing Requirements ✗
 
@@ -182,15 +203,17 @@ public fun wrpAccessCertificateProfile(
 |-----------------------------------|----------------|-------------|------------|------------------------------------------------|
 | authorityKeyIdentifier            | M              | NC          | ✅          |                                                |
 | keyUsage                          | M              | C           | ✅          | Bits validated, criticality enforced           |
+| basicConstraints                  | M (end-entity) | C           | ✅          | Enforced via endEntity(), must be critical     |
 | CRLDistributionPoints             | M(C)           | NC          | ✅          |                                                |
 | AuthorityInfoAccess               | M              | NC          | ✅          | Enforced (caIssuers)                           |
 | CertificatePolicies               | M              | NC          | ✅          | OIDs validated (NOT required critical)         |
-| SubjectAltName                    | M              | NC          | ✅          | Contact info required (URI, email, telephone)  |
+| SubjectAltName                    | M              | NC          | ✅          | `wrpacSubjectAlternativeNames()` (URI, email, tel) |
 | ext-etsi-valassured-ST-certs      | R(C)           | NC          | ✅          | Fully validated (duration check)               |
 | noRevocationAvail                 | M(C)           | NC          | ✅          | Validated for validity-assured certs           |
 | qcStatements (esi4-qcStatement-1) | M(C) for QCP   | NC          | ✅          | Validated for qualified (QcCompliance)         |
 | qcStatements (esi4-qcStatement-4) | M(C) for QCP   | NC          | ✅          | Validated for qualified (QcSSCD)               |
 | qcStatements (esi4-qcStatement-6) | M(C) for QCP-l | NC          | ✅          | Validated for qualified legal (QcType)         |
+| Extension criticality control     | Restricted     | N/A         | ✅          | GEN-4.1-2: only keyUsage and basicConstraints may be critical |
 
 ### Certificate Policies
 

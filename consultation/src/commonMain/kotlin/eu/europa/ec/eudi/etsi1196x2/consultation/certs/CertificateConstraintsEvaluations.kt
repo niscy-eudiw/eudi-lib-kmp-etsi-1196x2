@@ -73,16 +73,12 @@ public object CertificateConstraintsEvaluations {
     }
 
     public fun mandatoryKeyUsage(
-        keyUsageAndCritical: ExtensionInfo<KeyUsageBits>?,
+        keyUsage: KeyUsageBits?,
         requiredKeyUsage: String,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (keyUsageAndCritical == null) {
+        if (keyUsage == null) {
             add(certificateDoesNotContainKeyUsage)
         } else {
-            val (keyUsage, critical) = keyUsageAndCritical
-            if (!critical) {
-                add(keyUsageNotMarkedCritical)
-            }
             if (!keyUsage[requiredKeyUsage]) {
                 add(certificateMissingKeyUsage(requiredKeyUsage))
             }
@@ -127,42 +123,33 @@ public object CertificateConstraintsEvaluations {
     }
 
     public fun policyOneOf(
-        policiesInfo: ExtensionInfo<List<String>>?,
+        policies: List<String>?,
         oids: Set<String>,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (policiesInfo == null) {
+        if (policies.isNullOrEmpty()) {
             add(certificateDoesNotContainPolicies(oids.toList()))
-        } else {
-            val policies = policiesInfo.value
-            when {
-                policies.isEmpty() -> {
-                    add(certificateDoesNotContainPolicies(oids.toList()))
-                }
-
-                policies.none { it in oids } -> {
-                    add(certificateDoesNotContainAnyPolicy(policies, oids.toList()))
-                }
-            }
+        } else if (policies.none { it in oids }) {
+            add(certificateDoesNotContainAnyPolicy(policies, oids.toList()))
         }
     }
 
     public fun policyIsPresent(
-        policiesInfo: ExtensionInfo<List<String>>?,
+        policies: List<String>?,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (policiesInfo == null || policiesInfo.value.isEmpty()) {
+        if (policies.isNullOrEmpty()) {
             add(missingCertificatePoliciesExtension)
         }
     }
 
     public fun aiaForCaIssued(
-        aiaInfo: ExtensionInfo<AuthorityInformationAccess>?,
+        aia: AuthorityInformationAccess?,
         isSelfSigned: Boolean,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
         // Only check AIA for non-self-signed certificates
         if (!isSelfSigned) {
-            if (aiaInfo == null) {
+            if (aia == null) {
                 add(caIssuedCertificateMissingAiaExtension)
-            } else if (aiaInfo.value.caIssuersUri == null) {
+            } else if (aia.caIssuersUri == null) {
                 add(aiaMissingIdAdCaIssuersAccessMethod)
             }
         }
@@ -198,17 +185,18 @@ public object CertificateConstraintsEvaluations {
             }
         }
 
-    public fun subjectNaturalPersonAttributes(
+    public fun naturalPersonDN(
+        attribute: String,
         subject: DistinguishedName?,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
         if (subject == null) {
-            add(missingSubjectDistinguishedName)
+            add(missingDN(attribute))
             return@CertificateConstraintEvaluation
         }
 
         // countryName is mandatory
         if (subject.country.isNullOrBlank()) {
-            add(subjectMissingCountryName)
+            add(missingCountryName(attribute))
         }
 
         // givenName, surname, or pseudonym is mandatory
@@ -216,48 +204,49 @@ public object CertificateConstraintsEvaluations {
             !subject.surname.isNullOrBlank() ||
             !subject.pseudonym.isNullOrBlank()
         if (!hasName) {
-            add(subjectMissingPersonalName)
+            add(missingPersonalName(attribute))
         }
 
         // commonName is mandatory
         if (subject.commonName.isNullOrBlank()) {
-            add(subjectMissingCommonName)
+            add(missingCommonName(attribute))
         }
 
         // serialNumber is mandatory for natural persons
         val serialNumber = subject.serialNumber
         if (serialNumber.isNullOrBlank()) {
-            add(subjectMissingSerialNumber)
+            add(missingSerialNumber(attribute))
         } else {
             // natural person identity type reference validation (EN 319 412-1 clause 5.1.3)
             if (!isValidNaturalPersonId(serialNumber)) {
-                add(subjectSerialNumberInvalidFormat)
+                add(serialNumberInvalidFormat(attribute))
             }
         }
     }
 
-    public fun validSubjectLegalPersonAttributes(
-        subject: DistinguishedName?,
+    public fun legalPersonDN(
+        attribute: String,
+        dn: DistinguishedName?,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (subject == null) {
-            add(missingSubjectDistinguishedName)
+        if (dn == null) {
+            add(missingDN(attribute))
             return@CertificateConstraintEvaluation
         }
 
         // countryName is mandatory
-        if (subject.country.isNullOrBlank()) {
-            add(subjectMissingCountryName)
+        if (dn.country.isNullOrBlank()) {
+            add(missingCountryName(attribute))
         }
 
         // organizationName is mandatory
-        if (subject.organization.isNullOrBlank()) {
-            add(subjectMissingOrganizationName)
+        if (dn.organization.isNullOrBlank()) {
+            add(missingOrganizationName(attribute))
         }
 
         // organizationIdentifier is mandatory
-        val organizationIdentifier = subject.organizationIdentifier
+        val organizationIdentifier = dn.organizationIdentifier
         if (organizationIdentifier.isNullOrBlank()) {
-            add(subjectMissingOrganizationIdentifier)
+            add(missingOrganizationIdentifier(attribute))
         } else {
             // organizationIdentifier format validation (EN 319 412-1 clause 5.1.4)
             if (!isValidOrgId(organizationIdentifier)) {
@@ -266,43 +255,8 @@ public object CertificateConstraintsEvaluations {
         }
 
         // commonName is mandatory
-        if (subject.commonName.isNullOrBlank()) {
-            add(subjectMissingCommonName)
-        }
-    }
-
-    public fun validIssuerLegalPersonAttributes(
-        issuer: DistinguishedName?,
-    ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (issuer == null) {
-            add(missingIssuerDistinguishedName)
-            return@CertificateConstraintEvaluation
-        }
-
-        // countryName is mandatory
-        if (issuer.country.isNullOrBlank()) {
-            add(issuerMissingCountryName)
-        }
-
-        // organizationName is mandatory
-        if (issuer.organization.isNullOrBlank()) {
-            add(issuerMissingOrganizationName)
-        }
-
-        // organizationIdentifier is mandatory
-        val organizationIdentifier = issuer.organizationIdentifier
-        if (organizationIdentifier.isNullOrBlank()) {
-            add(issuerMissingOrganizationIdentifier)
-        } else {
-            // organizationIdentifier format validation (EN 319 412-1 clause 5.1.4)
-            if (!isValidOrgId(organizationIdentifier)) {
-                add(organizationIdentifierInvalidFormat)
-            }
-        }
-
-        // commonName is mandatory
-        if (issuer.commonName.isNullOrBlank()) {
-            add(issuerMissingCommonName)
+        if (dn.commonName.isNullOrBlank()) {
+            add(missingCommonName(attribute))
         }
     }
 
@@ -330,34 +284,10 @@ public object CertificateConstraintsEvaluations {
         return identityType in VALID_NAT_ID_TYPES
     }
 
-    public fun validIssuerAttributes(
-        issuer: DistinguishedName?,
-        requireCountryName: Boolean = true,
-        requireOrganizationName: Boolean = true,
-        requireCommonName: Boolean = true,
-    ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (issuer == null) {
-            add(missingIssuerDistinguishedName)
-            return@CertificateConstraintEvaluation
-        }
-
-        if (requireCountryName && issuer.country.isNullOrBlank()) {
-            add(issuerMissingCountryName)
-        }
-
-        if (requireOrganizationName && issuer.organization.isNullOrBlank()) {
-            add(issuerMissingOrganizationName)
-        }
-
-        if (requireCommonName && issuer.commonName.isNullOrBlank()) {
-            add(issuerMissingCommonName)
-        }
-    }
-
     public fun subjectAltName(
-        sanInfo: ExtensionInfo<List<SubjectAlternativeName>>?,
+        san: List<SubjectAlternativeName>?,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        if (sanInfo == null || sanInfo.value.isEmpty()) {
+        if (san.isNullOrEmpty()) {
             add(missingSubjectAltName)
         }
     }
@@ -370,13 +300,21 @@ public object CertificateConstraintsEvaluations {
         }
     }
 
+    public fun subjectKeyIdentifier(
+        ski: ByteArray?,
+    ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
+        if (ski == null) {
+            add(missingSubjectKeyIdentifier)
+        }
+    }
+
     public fun evaluateCrlDistributionPointsIfNoOcspAndNotValAssured(
         crldp: List<CrlDistributionPoint>,
-        aiaInfo: ExtensionInfo<AuthorityInformationAccess>?,
+        aia: AuthorityInformationAccess?,
         qcStatements: List<QCStatementInfo>,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
         // Exempt if OCSP responder is present in AIA
-        val hasOcsp = aiaInfo?.value?.ocspUri != null
+        val hasOcsp = aia?.ocspUri != null
         if (hasOcsp) return@CertificateConstraintEvaluation
 
         // Exempt if validity-assured short-term certificate QC statement is present
@@ -400,12 +338,12 @@ public object CertificateConstraintsEvaluations {
     }
 
     public fun evaluateQcStatementsForPolicy(
-        policiesInfo: ExtensionInfo<List<String>>?,
+        policies: List<String>?,
         qcStatements: List<QCStatementInfo>,
         rules: (String) -> List<String>,
     ): CertificateConstraintEvaluation = CertificateConstraintEvaluation {
-        val policies = policiesInfo?.value ?: emptyList()
-        val requiredQcTypes = policies
+        val policyList = policies ?: emptyList()
+        val requiredQcTypes = policyList
             .flatMap { rules(it) }
             .toSet()
 
@@ -428,6 +366,35 @@ public object CertificateConstraintsEvaluations {
             add(publicKeyNotCompliant(pkInfo, options))
         }
     }
+
+    /**
+     * Checks that the criticality of specified extensions matches the expected value.
+     *
+     * @param mustBeCritical true if extensions should be critical, false if they should be non-critical
+     * @param filter predicate that returns true for OIDs that should have this criticality
+     * @return a function that evaluates the criticality map
+     */
+    public fun checkCriticalExtension(
+        extensionsCriticality: Map<String, Boolean>,
+        mustBeCritical: Boolean,
+        filter: (String) -> Boolean,
+    ): CertificateConstraintEvaluation =
+        CertificateConstraintEvaluation {
+            fun violation(oid: String): CertificateConstraintViolation {
+                val reason = if (mustBeCritical) {
+                    "Extension $oid must be marked critical but is not"
+                } else {
+                    "Extension $oid must not be marked critical but is marked critical"
+                }
+                return CertificateConstraintViolation(reason)
+            }
+
+            extensionsCriticality.forEach { (oid, isCritical) ->
+                if (filter(oid) && isCritical != mustBeCritical) {
+                    add(violation(oid))
+                }
+            }
+        }
 
     public fun evaluateValidityAssuredShortTerm(
         maxShortTermDuration: Duration = 7.days,
@@ -500,9 +467,10 @@ public object CertificateConstraintsEvaluations {
             "CA certificate missing pathLenConstraint",
         )
 
-    public fun certificateMissingKeyUsage(keyUsage: String): CertificateConstraintViolation = CertificateConstraintViolation(
-        "Certificate keyUsage missing required bits: $keyUsage",
-    )
+    public fun certificateMissingKeyUsage(keyUsage: String): CertificateConstraintViolation =
+        CertificateConstraintViolation(
+            "Certificate keyUsage missing required bits: $keyUsage",
+        )
 
     public val keyUsageNotMarkedCritical: CertificateConstraintViolation
         get() = CertificateConstraintViolation(
@@ -572,59 +540,43 @@ public object CertificateConstraintsEvaluations {
         )
 
     // Subject/Issuer DN violations
-    public val missingSubjectDistinguishedName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(reason = "Certificate subject DN is missing")
+    public fun missingDN(attribute: String): CertificateConstraintViolation =
+        CertificateConstraintViolation(reason = "Certificate $attribute DN is missing")
 
-    public val missingIssuerDistinguishedName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(reason = "Certificate issuer DN is missing")
+    public fun missingCountryName(attribute: String): CertificateConstraintViolation = CertificateConstraintViolation(
+        reason = "$attribute DN missing required countryName attribute (per ETSI EN 319 412-2/3)",
+    )
 
-    public val subjectMissingCountryName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Subject DN missing required countryName attribute (per ETSI EN 319 412-2/3)",
+    public fun missingPersonalName(attribute: String): CertificateConstraintViolation = CertificateConstraintViolation(
+        reason = "$attribute DN missing required personal name attribute (givenName, surname, or pseudonym per ETSI EN 319 412-2)",
+    )
+
+    public fun missingCommonName(attribute: String): CertificateConstraintViolation = CertificateConstraintViolation(
+        reason = "$attribute DN missing required commonName attribute",
+    )
+
+    public fun missingOrganizationName(attribute: String): CertificateConstraintViolation =
+        CertificateConstraintViolation(
+            reason = "$attribute DN missing required organizationName attribute (per ETSI EN 319 412-3)",
         )
 
-    public val subjectMissingPersonalName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Subject DN missing required personal name attribute (givenName, surname, or pseudonym per ETSI EN 319 412-2)",
+    public fun missingOrganizationIdentifier(attribute: String): CertificateConstraintViolation =
+        CertificateConstraintViolation(
+            reason = "$attribute DN missing required organizationIdentifier attribute (per ETSI EN 319 412-3)",
         )
 
-    public val subjectMissingCommonName: CertificateConstraintViolation
+    public fun missingSerialNumber(attribute: String): CertificateConstraintViolation = CertificateConstraintViolation(
+        reason = "$attribute DN missing required serialNumber attribute (per ETSI EN 319 412-2)",
+    )
+
+    public val issuerMissingSerialNumber: CertificateConstraintViolation
         get() = CertificateConstraintViolation(
-            reason = "Subject DN missing required commonName attribute",
+            reason = "Issuer DN missing required serialNumber attribute (per ETSI EN 319 412-2)",
         )
 
-    public val subjectMissingOrganizationName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Subject DN missing required organizationName attribute (per ETSI EN 319 412-3)",
-        )
-
-    public val subjectMissingOrganizationIdentifier: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Subject DN missing required organizationIdentifier attribute (per ETSI EN 319 412-3)",
-        )
-
-    public val subjectMissingSerialNumber: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Subject DN missing required serialNumber attribute (per ETSI EN 319 412-2)",
-        )
-
-    public val subjectSerialNumberInvalidFormat: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Subject DN serialNumber has invalid format. Expected: XXXCC-identifier (per EN 319 412-1 clause 5.1.3)",
-        )
-
-    public val issuerMissingCountryName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(reason = "Issuer DN missing required countryName attribute")
-
-    public val issuerMissingOrganizationName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(reason = "Issuer DN missing required organizationName attribute")
-
-    public val issuerMissingCommonName: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(reason = "Issuer DN missing required commonName attribute")
-
-    public val issuerMissingOrganizationIdentifier: CertificateConstraintViolation
-        get() = CertificateConstraintViolation(
-            reason = "Issuer DN missing required organizationIdentifier attribute (per ETSI EN 319 412-3)",
+    public fun serialNumberInvalidFormat(attribute: String): CertificateConstraintViolation =
+        CertificateConstraintViolation(
+            reason = "$attribute DN serialNumber has invalid format. Expected: XXXCC-identifier (per EN 319 412-1 clause 5.1.3)",
         )
 
     public val organizationIdentifierInvalidFormat: CertificateConstraintViolation
@@ -640,6 +592,12 @@ public object CertificateConstraintsEvaluations {
     public val missingAuthorityKeyIdentifier: CertificateConstraintViolation
         get() = CertificateConstraintViolation(
             reason = "Certificate missing authorityKeyIdentifier extension (per ETSI EN 319 412-2)",
+        )
+
+    // Subject Key Identifier violations
+    public val missingSubjectKeyIdentifier: CertificateConstraintViolation
+        get() = CertificateConstraintViolation(
+            reason = "Certificate missing subjectKeyIdentifier extension",
         )
 
     // CRL Distribution Points violations

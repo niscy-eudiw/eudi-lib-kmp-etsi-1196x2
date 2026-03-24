@@ -73,6 +73,15 @@ public fun ProfileBuilder.validAt(time: Instant? = null) {
     validity { period -> CertificateConstraintsEvaluations.validAt(period, time) }
 }
 
+public fun ProfileBuilder.extensionCriticality(
+    mustBeCritical: Boolean,
+    filter: (String) -> Boolean,
+) {
+    extensionCriticality { extension ->
+        CertificateConstraintsEvaluations.checkCriticalExtension(extension, mustBeCritical, filter)
+    }
+}
+
 //
 // Certificate Policies
 //
@@ -143,51 +152,20 @@ public fun ProfileBuilder.positiveSerialNumber() {
 // Subject/Issuer DN Constraints
 //
 
-public fun ProfileBuilder.subjectNaturalPersonAttributes() {
-    subject { subject -> CertificateConstraintsEvaluations.subjectNaturalPersonAttributes(subject) }
+public fun ProfileBuilder.subjectNaturalPerson() {
+    subject { subject -> CertificateConstraintsEvaluations.naturalPersonDN("Subject", subject) }
 }
 
-public fun ProfileBuilder.validSubjectLegalPersonAttributes() {
-    subject { subject -> CertificateConstraintsEvaluations.validSubjectLegalPersonAttributes(subject) }
+public fun ProfileBuilder.subjectLegalPerson() {
+    subject { subject -> CertificateConstraintsEvaluations.legalPersonDN("Subject", subject) }
 }
 
-/**
- * Requires the issuer DN to contain attributes for a legal person
- * per ETSI EN 319 412-3.
- *
- * Required attributes:
- * - countryName (C)
- * - organizationName (O)
- * - organizationIdentifier
- * - commonName (CN)
- *
- * This is used for WRPAC Provider CA certificates, which are always
- * operated by legal persons under eIDAS regulation.
- */
-public fun ProfileBuilder.issuerLegalPersonAttributes() {
-    issuer { issuer -> CertificateConstraintsEvaluations.validIssuerLegalPersonAttributes(issuer) }
+public fun ProfileBuilder.issuerNaturalPerson() {
+    issuer { issuer -> CertificateConstraintsEvaluations.naturalPersonDN("Issuer", issuer) }
 }
 
-/**
- * Requires the issuer DN to contain appropriate attributes.
- *
- * @param requireCountryName whether countryName is required (default: true)
- * @param requireOrganizationName whether organizationName is required (default: true)
- * @param requireCommonName whether commonName is required (default: true)
- */
-public fun ProfileBuilder.validIssuerAttributes(
-    requireCountryName: Boolean = true,
-    requireOrganizationName: Boolean = true,
-    requireCommonName: Boolean = true,
-) {
-    issuer { issuer ->
-        CertificateConstraintsEvaluations.validIssuerAttributes(
-            issuer,
-            requireCountryName,
-            requireOrganizationName,
-            requireCommonName,
-        )
-    }
+public fun ProfileBuilder.issuerLegalPerson() {
+    issuer { issuer -> CertificateConstraintsEvaluations.legalPersonDN("Issuer", issuer) }
 }
 
 //
@@ -204,6 +182,10 @@ public fun ProfileBuilder.subjectAltName() {
 
 public fun ProfileBuilder.authorityKeyIdentifier() {
     authorityKeyIdentifier { aki -> CertificateConstraintsEvaluations.authorityKeyIdentifier(aki) }
+}
+
+public fun ProfileBuilder.subjectKeyIdentifier() {
+    subjectKeyIdentifier { ski -> CertificateConstraintsEvaluations.subjectKeyIdentifier(ski) }
 }
 
 public fun ProfileBuilder.crlDistributionPointsIfNoOcspAndNotValAssured() {

@@ -36,6 +36,7 @@ public fun wrpAccessCertificateProfile(
     // Basic certificate requirements
     endEntity()
     keyUsageDigitalSignature()
+    wrpacExplicitExtensionCriticality()
     validAt(at)
     policyOneOf(NCP_N_EUDIWRP, NCP_L_EUDIWRP, QCP_N_EUDIWRP, QCP_L_EUDIWRP)
     notSelfSigned()
@@ -56,7 +57,7 @@ public fun wrpAccessCertificateProfile(
     validityAssuredShortTerm(maxShortTermDuration)
 
     // Subject Alternative Name with contact info required (TS 119 411-8)
-    subjectAltNameForWRPAC()
+    wrpacSubjectAlternativeNames()
 
     // CRL Distribution Points required if no OCSP (EN 319 412-2)
     crlDistributionPointsIfNoOcspAndNotValAssured()
@@ -81,23 +82,36 @@ public fun wrpAccessCertificateProfile(
     }
 
     // Subject DN attributes required based on certificate policy (natural person vs legal person)
-    subjectNameForWRPAC()
+    wrpacSubject()
 
     // Issuer DN attributes required (WRPAC Provider CA is always a legal person)
-    issuerLegalPersonAttributes()
+    issuerLegalPerson()
 }
 
-internal fun ProfileBuilder.subjectAltNameForWRPAC() =
+/**
+ * EN 319 412-1 GEN-4.1-2
+ */
+internal fun ProfileBuilder.wrpacExplicitExtensionCriticality() {
+    fun basicConstraintOrKeyUsage(oid: String) =
+        oid == RFC5280.EXT_BASIC_CONSTRAINTS || oid == RFC5280.EXT_KEY_USAGE
+    extensionCriticality(mustBeCritical = true) { oid ->
+        basicConstraintOrKeyUsage(oid)
+    }
+    extensionCriticality(mustBeCritical = false) { oid ->
+        !basicConstraintOrKeyUsage(oid)
+    }
+}
+internal fun ProfileBuilder.wrpacSubjectAlternativeNames() =
     subjectAltNames { subjectAltNames ->
         validateSubjectAltNameForWRPAC(subjectAltNames)
     }
 
-internal fun ProfileBuilder.subjectNameForWRPAC() =
+internal fun ProfileBuilder.wrpacSubject() =
     combine(
         CertificateOperationsAlgebra.GetPolicies,
         CertificateOperationsAlgebra.GetSubject,
     ) { (policies, subject) ->
-        validateSubjectNameForWRPAC(policies, subject)
+        validateSubjectForWRPAC(policies, subject)
     }
 
 /**
@@ -107,17 +121,17 @@ internal fun ProfileBuilder.subjectNameForWRPAC() =
  * in the subjectAltName extension (URI, email, or telephone).
  */
 internal fun validateSubjectAltNameForWRPAC(
-    subjectAltNames: ExtensionInfo<List<SubjectAlternativeName>>?,
+    subjectAltNames: List<SubjectAlternativeName>?,
 ): CertificateConstraintEvaluation =
     CertificateConstraintEvaluation {
-        if (subjectAltNames == null || subjectAltNames.value.isEmpty()) {
+        if (subjectAltNames.isNullOrEmpty()) {
             val missingSubjectAltName =
                 CertificateConstraintViolation("Certificate missing subjectAltName extension")
             add(missingSubjectAltName)
             return@CertificateConstraintEvaluation
         }
 
-        val hasContactInfo = subjectAltNames.value.any { san ->
+        val hasContactInfo = subjectAltNames.any { san ->
             san is SubjectAlternativeName.Uri ||
                 san is SubjectAlternativeName.Email ||
                 san is SubjectAlternativeName.Telephone
@@ -143,19 +157,19 @@ internal fun validateSubjectAltNameForWRPAC(
  *
  * The certificate policy OID determines which set of attributes is required.
  */
-internal fun validateSubjectNameForWRPAC(
-    policies: ExtensionInfo<List<String>>?,
+internal fun validateSubjectForWRPAC(
+    policies: List<String>?,
     subject: DistinguishedName?,
 ): CertificateConstraintEvaluation {
-    if (policies == null || policies.value.isEmpty()) return CertificateConstraintEvaluation.Met
+    if (policies.isNullOrEmpty()) return CertificateConstraintEvaluation.Met
 
-    val isNaturalPerson = policies.value.any { it in listOf(NCP_N_EUDIWRP, QCP_N_EUDIWRP) }
-    val isLegalPerson = policies.value.any { it in listOf(NCP_L_EUDIWRP, QCP_L_EUDIWRP) }
+    val isNaturalPerson = policies.any { it in listOf(NCP_N_EUDIWRP, QCP_N_EUDIWRP) }
+    val isLegalPerson = policies.any { it in listOf(NCP_L_EUDIWRP, QCP_L_EUDIWRP) }
     return when {
         isNaturalPerson && !isLegalPerson ->
-            CertificateConstraintsEvaluations.subjectNaturalPersonAttributes(subject)
+            CertificateConstraintsEvaluations.naturalPersonDN("Subject", subject)
         isLegalPerson && !isNaturalPerson ->
-            CertificateConstraintsEvaluations.validSubjectLegalPersonAttributes(subject)
+            CertificateConstraintsEvaluations.legalPersonDN("Subject", subject)
         else -> {
             // Not a concern of this rule to enforce policy OIDs
             CertificateConstraintEvaluation.Met

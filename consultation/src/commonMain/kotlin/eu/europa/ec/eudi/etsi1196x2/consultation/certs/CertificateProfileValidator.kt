@@ -175,6 +175,12 @@ public interface CertificateProfileInterpreter<CERT : Any> {
                         is CertificateOperationsAlgebra.HasExtension ->
                             operations.hasExtension(certificate, op.oid) as T
 
+                        is CertificateOperationsAlgebra.GetSubjectKeyIdentifier ->
+                            operations.getSubjectKeyIdentifier(certificate) as T
+
+                        is CertificateOperationsAlgebra.GetExtensionCriticality ->
+                            operations.getExtensionCriticality(certificate) as T
+
                         is CertificateOperationsAlgebra.GetCombined<*, *, *> -> {
                             val a = interpret(op.first, certificate)
                             val b = interpret(op.second, certificate)
