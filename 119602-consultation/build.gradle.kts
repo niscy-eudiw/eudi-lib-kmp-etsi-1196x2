@@ -106,6 +106,7 @@ kotlin {
                 // Common dependencies
                 api(projects.etsi119602DataModel)
                 api(projects.etsi1196x2Consultation)
+                api(projects.etsi1196x2Signum) // For Signum-based provisioner
                 implementation(libs.atomicfu)
                 implementation(libs.kotlinx.io.core)
                 api(libs.ktor.client.core)
@@ -139,6 +140,12 @@ kotlin {
         androidUnitTest {
             dependencies {
                 implementation(libs.ktor.client.okhttp)
+            }
+        }
+
+        val iosMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.darwin)
             }
         }
     }
