@@ -24,6 +24,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlin.jvm.JvmInline
 import kotlin.time.ExperimentalTime
 
 /**
@@ -297,9 +298,8 @@ public object PolicyOrLegalNoticeSerializer :
 }
 
 @Serializable
-
-
-public data class HistoricalInformationPeriod(
+@JvmInline
+public value class HistoricalInformationPeriod(
     public val value: Int,
 )
 

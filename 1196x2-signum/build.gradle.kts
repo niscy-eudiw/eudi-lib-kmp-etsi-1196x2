@@ -75,8 +75,11 @@ kotlin {
             // Set valid iOS bundle identifier (no underscores)
             binaryOption("bundleId", "eu.europa.ec.eudi.etsi1196x2.signum")
 
-            // Export consultation module for Swift access
-            export(projects.etsi1196x2Consultation)
+            // Export all modules transitively for Swift access
+            // This allows iOS developers to import only etsi_1196x2_signum and get everything
+            export(projects.etsi1196x2Consultation)      // Core abstractions
+            export(projects.etsi119602Consultation)      // LoTE loading & PathHelpers
+            export(projects.etsi119602DataModel)         // LoTE JSON data model
         }
     }
 
@@ -108,6 +111,9 @@ kotlin {
                 // Core consultation abstractions
                 api(projects.etsi1196x2Consultation)
 
+                // LoTE consultation module for trust list loading
+                api(projects.etsi119602Consultation)
+
                 // Signum library - cross-platform X509Certificate and crypto
                 api(libs.signum.indispensable)
                 api(libs.signum.indispensable.cosef)
@@ -118,6 +124,14 @@ kotlin {
 
                 // DateTime for certificate validity periods
                 implementation(libs.kotlinx.datetime)
+
+                // Ktor for HTTP client (needed by PathHelpers)
+                api(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.json)
+
+                // File system operations (needed by PathHelpers)
+                implementation(libs.kotlinx.io.core)
             }
         }
 

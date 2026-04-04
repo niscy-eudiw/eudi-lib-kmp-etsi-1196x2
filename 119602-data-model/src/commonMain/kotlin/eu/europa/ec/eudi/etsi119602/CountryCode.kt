@@ -16,11 +16,11 @@
 package eu.europa.ec.eudi.etsi119602
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 @Serializable
-
-
-public data class CountryCode
+@JvmInline
+public value class CountryCode
 @Throws(IllegalArgumentException::class)
 public constructor(
     public val value: String,

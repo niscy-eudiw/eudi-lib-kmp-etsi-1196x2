@@ -15,20 +15,16 @@
  */
 package eu.europa.ec.eudi.etsi119602
 
+import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
 
 @Serializable
-
-
-public data class Language
-@Throws(IllegalArgumentException::class)
-public constructor(public val value: String) {
+@JvmInline
+public value class Language(public val value: String) {
     init {
         Assertions.requireNotBlank(value, ETSI19602.LANG)
         require(value.matches(ALPHA_2_PATTERN)) { "Invalid ${ETSI19602.LANG}" }
     }
-
-    override fun toString(): String = value
 
     public companion object {
         public val ENGLISH: Language get() = Language(ETSI19602.LANG_ENGLISH)

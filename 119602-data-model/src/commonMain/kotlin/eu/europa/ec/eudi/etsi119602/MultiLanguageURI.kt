@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.etsi119602
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 @Serializable
 public data class MultiLanguageURI(
@@ -31,9 +32,8 @@ public data class MultiLanguageURI(
 
 // TODO Value is URI
 @Serializable
-
-
-public data class URIValue(public val value: String) {
+@JvmInline
+public value class URIValue(public val value: String) {
     init {
         Assertions.requireNotBlank(value, ETSI19602.URI_VALUE)
     }

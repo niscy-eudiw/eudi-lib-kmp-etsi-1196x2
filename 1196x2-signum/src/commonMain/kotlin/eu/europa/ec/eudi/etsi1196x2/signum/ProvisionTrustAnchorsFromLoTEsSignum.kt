@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.etsi119602.consultation
+package eu.europa.ec.eudi.etsi1196x2.signum
 
 import at.asitplus.signum.indispensable.pki.X509Certificate
 import eu.europa.ec.eudi.etsi119602.ServiceDigitalIdentity
+import eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem
+import eu.europa.ec.eudi.etsi119602.consultation.LoadLoTEAndPointers
+import eu.europa.ec.eudi.etsi119602.consultation.LotEMeta
+import eu.europa.ec.eudi.etsi119602.consultation.ProvisionTrustAnchorsFromLoTEs
+import eu.europa.ec.eudi.etsi119602.consultation.eu
 import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingDirectTrust
 import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIX
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.CertificateProfileValidator
-import eu.europa.ec.eudi.etsi1196x2.signum.SignumCertificateOperations
-import eu.europa.ec.eudi.etsi1196x2.signum.ValidateChainCertificateUsingPKIXSignum
 
 /**
  * Creates a [ProvisionTrustAnchorsFromLoTEs] instance configured for EU Digital Identity Wallet

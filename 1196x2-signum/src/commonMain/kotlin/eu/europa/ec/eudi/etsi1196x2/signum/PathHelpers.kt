@@ -13,10 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.etsi119602.consultation
+package eu.europa.ec.eudi.etsi1196x2.signum
 
 import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
+import eu.europa.ec.eudi.etsi119602.consultation.LoadLoTEAndPointers
+import eu.europa.ec.eudi.etsi119602.consultation.LotEMeta
+import eu.europa.ec.eudi.etsi119602.consultation.ProvisionTrustAnchorsFromLoTEs
+import eu.europa.ec.eudi.etsi119602.consultation.eu
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
@@ -61,22 +65,36 @@ public fun hoursAsDuration(hours: Int): Duration = hours.hours
 public fun getDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
 
 /**
+ * Helper to get ContinueOnProblem.Never for Swift/iOS.
+ * This strategy stops immediately when any problem occurs during LoTE loading.
+ */
+public fun getContinueOnProblemNever(): eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem =
+    eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem.Never
+
+/**
+ * Helper to get ContinueOnProblem.Always for Swift/iOS.
+ * This strategy continues even if all LoTEs fail to load.
+ */
+public fun getContinueOnProblemAlways(): eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem =
+    eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem.Always
+
+/**
+ * Helper to get ContinueOnProblem.AlwaysIfDownloaded for Swift/iOS.
+ * This strategy continues if at least the main LoTE was successfully downloaded,
+ * even if other (pointer) lists fail to load. This is the recommended default for iOS.
+ */
+public fun getContinueOnProblemAlwaysIfDownloaded(): eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem =
+    eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem.AlwaysIfDownloaded
+
+/**
  * Helper to create HttpClient for Swift/iOS.
- * This creates a properly configured HttpClient with JSON support for LoTE downloads.
+ * This uses the same configuration as the JVM/Android createHttpClient().
  *
  * NOTE: On iOS, this uses the Darwin (NSURLSession) engine automatically.
- * Make sure you've added ktor-client-darwin dependency to the iOS framework.
  *
  * @return Configured HttpClient for LoTE operations
  */
-public fun createHttpClientForIOS(): HttpClient = HttpClient {
-    install(ContentNegotiation) {
-        json(Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-        })
-    }
-}
+public fun createHttpClientForIOS(): HttpClient = eu.europa.ec.eudi.etsi119602.consultation.createHttpClient()
 
 /**
  * Helper to get EU SupportedLists configuration for Swift/iOS.
@@ -106,13 +124,16 @@ public fun createProvisionTrustAnchorsSignum(
  *
  * @param loadLoTEAndPointers Loader for fetching LoTEs and their pointers
  * @param svcTypePerCtx Service type metadata per verification context
+ * @param continueOnProblem Error handling strategy (defaults to AlwaysIfDownloaded for better iOS reliability)
  * @return Configured provisioner for EUDIW verification contexts using Signum
  */
 public fun createProvisionTrustAnchorsSignumWithConfig(
     loadLoTEAndPointers: LoadLoTEAndPointers,
     svcTypePerCtx: SupportedLists<LotEMeta<VerificationContext>>,
+    continueOnProblem: eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem = eu.europa.ec.eudi.etsi119602.consultation.ContinueOnProblem.AlwaysIfDownloaded,
 ): ProvisionTrustAnchorsFromLoTEs<List<at.asitplus.signum.indispensable.pki.X509Certificate>, VerificationContext, at.asitplus.signum.indispensable.pki.X509Certificate, at.asitplus.signum.indispensable.pki.X509Certificate> =
     ProvisionTrustAnchorsFromLoTEs.eudiwSignum(
         loadLoTEAndPointers = loadLoTEAndPointers,
         svcTypePerCtx = svcTypePerCtx,
+        continueOnProblem = continueOnProblem,
     )

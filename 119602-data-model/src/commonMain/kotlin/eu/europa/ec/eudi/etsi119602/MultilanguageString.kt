@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.etsi119602
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 @Serializable
 public data class MultilanguageString(
@@ -34,9 +35,8 @@ public data class MultilanguageString(
 }
 
 @Serializable
-
-
-public data class MultilingualStringValue(public val value: String) {
+@JvmInline
+public value class MultilingualStringValue(public val value: String) {
     init {
         require(isValid(value)) { "Invalid multilingual string" }
     }
