@@ -17,10 +17,6 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
 
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.*
 import kotlinx.cinterop.*
-import platform.CoreFoundation.CFDataRef
-import platform.Foundation.CFBridgingRelease
-import platform.Foundation.NSData
-import platform.Security.SecCertificateCopyData
 import platform.Security.SecCertificateRef
 
 /**

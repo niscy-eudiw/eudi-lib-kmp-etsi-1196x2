@@ -222,7 +222,7 @@ public class SignumCertificateOperations : CertificateOperations<X509Certificate
 
             // Parse the OCTET STRING content to get the BIT STRING
             val bitString = Asn1BitString.decodeFromTlv(
-                Asn1Element.parse(octetString.content).asPrimitive()
+                Asn1Element.parse(octetString.content).asPrimitive(),
             )
 
             // Extract bit values

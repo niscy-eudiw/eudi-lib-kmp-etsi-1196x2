@@ -77,9 +77,9 @@ kotlin {
 
             // Export all modules transitively for Swift access
             // This allows iOS developers to import only etsi_1196x2_signum and get everything
-            export(projects.etsi1196x2Consultation)      // Core abstractions
-            export(projects.etsi119602Consultation)      // LoTE loading & PathHelpers
-            export(projects.etsi119602DataModel)         // LoTE JSON data model
+            export(projects.etsi1196x2Consultation) // Core abstractions
+            export(projects.etsi119602Consultation) // LoTE loading & PathHelpers
+            export(projects.etsi119602DataModel) // LoTE JSON data model
         }
     }
 

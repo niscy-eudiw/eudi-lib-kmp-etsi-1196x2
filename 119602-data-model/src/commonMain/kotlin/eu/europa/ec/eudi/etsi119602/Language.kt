@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.etsi119602
 
-import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 @Serializable
 @JvmInline

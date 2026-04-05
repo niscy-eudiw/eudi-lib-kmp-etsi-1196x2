@@ -65,7 +65,7 @@ class SignumCertificateOperationsTest {
         assertNotNull(validity.notAfter, "notAfter should not be null")
         assertTrue(
             validity.notBefore < validity.notAfter,
-            "notBefore should be before notAfter"
+            "notBefore should be before notAfter",
         )
     }
 

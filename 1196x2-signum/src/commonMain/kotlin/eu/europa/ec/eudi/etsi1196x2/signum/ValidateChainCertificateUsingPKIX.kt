@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.etsi1196x2.signum
 
 import at.asitplus.signum.indispensable.X509SignatureAlgorithm
-import at.asitplus.signum.indispensable.isSupported
 import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.requireSupported
 import at.asitplus.signum.supreme.sign.verifierFor
