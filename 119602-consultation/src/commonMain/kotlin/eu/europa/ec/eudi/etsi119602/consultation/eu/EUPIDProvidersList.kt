@@ -15,7 +15,10 @@
  */
 package eu.europa.ec.eudi.etsi119602.consultation.eu
 
-import eu.europa.ec.eudi.etsi119602.*
+import com.eygraber.uri.Uri
+import eu.europa.ec.eudi.etsi119602.CountryCode
+import eu.europa.ec.eudi.etsi119602.ETSI19602
+import eu.europa.ec.eudi.etsi119602.MultiLanguageURI
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.*
 import kotlin.time.Instant
 
@@ -33,9 +36,9 @@ public val EUPIDProvidersList: EUListOfTrustedEntitiesProfile =
     EUListOfTrustedEntitiesProfile(
         listAndSchemeInformation =
         EUListAndSchemeInformationProfile(
-            type = LoTEType.of(ETSI19602.EU_PID_PROVIDERS_LOTE),
-            statusDeterminationApproach = URIValue(ETSI19602.EU_PID_PROVIDERS_STATUS_DETERMINATION_APPROACH),
-            schemeCommunityRules = listOf(MultiLanguageURI.en(URIValue(ETSI19602.EU_PID_PROVIDERS_SCHEME_COMMUNITY_RULES))),
+            type = Uri.parse(ETSI19602.EU_PID_PROVIDERS_LOTE),
+            statusDeterminationApproach = Uri.parse(ETSI19602.EU_PID_PROVIDERS_STATUS_DETERMINATION_APPROACH),
+            schemeCommunityRules = listOf(MultiLanguageURI.en(Uri.parse(ETSI19602.EU_PID_PROVIDERS_SCHEME_COMMUNITY_RULES))),
             schemeTerritory = CountryCode.EU,
             maxMonthsUntilNextUpdate = 6,
             historicalInformationPeriod = ValueRequirement.Absent,
@@ -43,8 +46,8 @@ public val EUPIDProvidersList: EUListOfTrustedEntitiesProfile =
         trustedEntities =
         EUTrustedEntitiesProfile(
             serviceTypeIdentifiers = ServiceTypeIdentifiers.IssuanceAndRevocation(
-                issuance = ETSI19602.EU_PID_PROVIDERS_SVC_TYPE_ISSUANCE,
-                revocation = ETSI19602.EU_PID_PROVIDERS_SVC_TYPE_REVOCATION,
+                issuance = Uri.parse(ETSI19602.EU_PID_PROVIDERS_SVC_TYPE_ISSUANCE),
+                revocation = Uri.parse(ETSI19602.EU_PID_PROVIDERS_SVC_TYPE_REVOCATION),
             ),
             serviceDigitalIdentityMustHaveCertificates = true,
             serviceStatuses = emptySet(),
