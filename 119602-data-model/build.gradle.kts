@@ -37,6 +37,7 @@ kotlin {
                 "kotlin.time.ExperimentalTime",
                 "kotlin.contracts.ExperimentalContracts",
             )
+        compilerOptions.freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
     }
 
     // JVM target
@@ -165,7 +166,6 @@ mavenPublishing {
         KotlinMultiplatform(
             javadocJar = JavadocJar.Dokka(tasks.dokkaGeneratePublicationHtml),
             sourcesJar = true,
-            androidVariantsToPublish = listOf("release"),
         ),
     )
 
