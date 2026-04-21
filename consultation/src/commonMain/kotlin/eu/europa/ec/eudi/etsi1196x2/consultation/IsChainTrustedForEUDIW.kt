@@ -21,29 +21,24 @@ package eu.europa.ec.eudi.etsi1196x2.consultation
  */
 public sealed interface VerificationContext {
     /**
-     * Check the wallet provider's signature for a Wallet Instance Attestation (WIA)
+     * Check the wallet provider's signature for a Wallet Instance Attestation (WIA) and/or Key Attestation (KA)
      *
      * Can be used by an Authorization Server implementing
-     * Attestation-Based Client Authentication
+     * Attestation-Based Client Authentication to check the signature of a Wallet Instance Attestation (WIA).
+     * In addition, can be used by a Credential issuer to check the signature of a Key Attestation (KA), during issuance
+     * of device-bound attestations that require Key Attestation (KA)
      */
-    public data object WalletInstanceAttestation : VerificationContext
-
-    /**
-     * Check the wallet provider's signature for a Wallet Unit Attestation (WUA)
-     *
-     * Can be used by a Credential Issuer, issuing device-bound attestations
-     * that require WUA
-     */
-    public data object WalletUnitAttestation : VerificationContext
+    public data object WalletProviderAttestation : VerificationContext
 
     /**
      * Check the wallet provider's signature for the Token Status List that keeps
-     * the status of a Wallet Unit Attestation (WUA)
+     * the status of the wallet, located under `client_status` in Wallet Unit Attestation (WUA) or
+     * the status of the keystorage, located under `key_storage.status` in a Key Attestation (KA)
      *
-     * Can be used by a Credential Issuer, issuing device-bound attestations
-     * to keep track of WUA status
+     * Can be used by Credential issuer to check the `client_status` of the Wallet or to check the `key_storage.status`
+     * during issuance of device-bound attestations, that require Key Attestation (KA)
      */
-    public data object WalletUnitAttestationStatus : VerificationContext
+    public data object WalletOrKeyStorageStatus : VerificationContext
 
     /**
      * Check PID Provider's signature for a PID
