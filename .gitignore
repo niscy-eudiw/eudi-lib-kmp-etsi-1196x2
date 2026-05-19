@@ -25,3 +25,9 @@ gradle-app.setting
 build
 local.properties
 .kotlin
+
+# Swift Package Manager (PKIXBridge)
+.build/
+Packages/
+.swiftpm/
+.DS_Store
