@@ -20,8 +20,14 @@ import eu.europa.ec.eudi.etsi119602.consultation.eu.EUMDLProvidersListSpec
 import eu.europa.ec.eudi.etsi119602.consultation.eu.ServiceDigitalIdentityCertificateType
 import eu.europa.ec.eudi.etsi1196x2.consultation.CertificationChainValidation
 import eu.europa.ec.eudi.etsi1196x2.consultation.ComposeChainTrust
+import eu.europa.ec.eudi.etsi1196x2.consultation.GetTrustAnchors
+import eu.europa.ec.eudi.etsi1196x2.consultation.NonEmptyList
 import eu.europa.ec.eudi.etsi1196x2.consultation.SupportedLists
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChain
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingDirectTrustIos
+import eu.europa.ec.eudi.etsi1196x2.consultation.ValidateCertificateChainUsingPKIXIos
 import eu.europa.ec.eudi.etsi1196x2.consultation.VerificationContext
+import eu.europa.ec.eudi.etsi1196x2.consultation.validator
 import platform.Foundation.NSData
 
 /**
@@ -37,6 +43,23 @@ public data class IosValidationResult(
     val matchedAnchor: NSData?,
     val failureReason: String?,
 )
+
+/**
+ * The chain-validation strategy for [EudiwIosTrust.usingBundledAnchors].
+ */
+public enum class BundledAnchorMethod {
+    /**
+     * Full PKIX path validation via Apple `SecTrust`: the presented chain must build to one of the
+     * bundled anchors. Use when the bundled anchors are **CA** certificates (roots/intermediates).
+     */
+    PKIX,
+
+    /**
+     * Direct trust (certificate pinning): the chain's leaf must byte-match one of the bundled
+     * anchors. Use when the bundled anchors are the **exact end-entity** certificates to pin.
+     */
+    DIRECT_TRUST,
+}
 
 /**
  * One-call assembly of the iOS LoTE-based trust validator, intended for Swift consumers.
@@ -102,6 +125,54 @@ public object EudiwIosTrust {
         return ProvisionTrustAnchorsFromLoTEs
             .eudiwIos(loadLoTEAndPointers = loadLoTEAndPointers, svcTypePerCtx = svcTypePerCtx)
             .nonCached(locations)
+    }
+
+    /**
+     * Builds a validator backed by **bundled / hardcoded** certificate anchors instead of a
+     * downloaded LoTE — no network, JWT, or LoTE is involved. This is the iOS counterpart of the
+     * JVM `IsChainTrustedForContext.usingKeyStore(...)`.
+     *
+     * Pass the DER anchors ([NSData]) shipped with the app per context; pass `null` for contexts you
+     * do not need. The mDL context is registered under [mdlUseCase] (i.e. `VerificationContext.EAA("mdl")`).
+     * The returned validator uses the same [trustAnchors] / [validate] entry points as [nonCached].
+     *
+     * No ETSI end-entity profile is applied — these contexts validate purely by [method] — so bundled
+     * CA anchors are not rejected by the strict EUDI end-entity profiles.
+     *
+     * @param method [BundledAnchorMethod.PKIX] for chain-to-anchor path validation (anchors are CA
+     *        certificates) or [BundledAnchorMethod.DIRECT_TRUST] for leaf pinning (anchors are the
+     *        exact end-entity certificates).
+     */
+    public fun usingBundledAnchors(
+        pidAnchors: List<NSData>?,
+        walletAnchors: List<NSData>?,
+        wrpacAnchors: List<NSData>?,
+        wrprcAnchors: List<NSData>?,
+        pubEaaAnchors: List<NSData>?,
+        qeaAnchors: List<NSData>?,
+        mdlAnchors: List<NSData>?,
+        method: BundledAnchorMethod,
+    ): ComposeChainTrust<List<NSData>, VerificationContext, NSData> {
+        val anchorsByContext: Map<VerificationContext, List<NSData>> = buildMap {
+            pidAnchors?.let { put(VerificationContext.PID, it) }
+            walletAnchors?.let { put(VerificationContext.WalletProviderAttestation, it) }
+            wrpacAnchors?.let { put(VerificationContext.WalletRelyingPartyAccessCertificate, it) }
+            wrprcAnchors?.let { put(VerificationContext.WalletRelyingPartyRegistrationCertificate, it) }
+            pubEaaAnchors?.let { put(VerificationContext.PubEAA, it) }
+            qeaAnchors?.let { put(VerificationContext.QEAA, it) }
+            mdlAnchors?.let { put(VerificationContext.EAA(mdlUseCase), it) }
+        }
+
+        val getTrustAnchors = GetTrustAnchors<VerificationContext, NSData> { ctx ->
+            anchorsByContext[ctx]?.let { NonEmptyList.nelOrNull(it) }
+        }
+
+        val validateChain: ValidateCertificateChain<List<NSData>, NSData> = when (method) {
+            BundledAnchorMethod.PKIX -> ValidateCertificateChainUsingPKIXIos()
+            BundledAnchorMethod.DIRECT_TRUST -> ValidateCertificateChainUsingDirectTrustIos
+        }
+
+        return ComposeChainTrust(getTrustAnchors.validator(anchorsByContext.keys, validateChain))
     }
 
     private fun mdlMeta(): LotEMeta<VerificationContext> = LotEMeta(
