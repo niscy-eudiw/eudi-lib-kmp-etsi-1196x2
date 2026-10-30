@@ -24,7 +24,6 @@ import eu.europa.ec.eudi.etsi1196x2.consultation.certs.authorityInformationAcces
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.certificateProfile
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.endEntity
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.extensionCriticality
-import eu.europa.ec.eudi.etsi1196x2.consultation.certs.keyUsageDigitalSignature
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.mandatoryQcType
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.policyIsPresent
 import eu.europa.ec.eudi.etsi1196x2.consultation.certs.positiveSerialNumber
@@ -39,7 +38,7 @@ public fun walletProviderSigningCertificateProfile(at: Instant? = null): Certifi
         endEntity()
         version3()
         mandatoryQcType(innerIdentifier = ETSI119412Part6.ID_ETSI_QCT_WAL)
-        keyUsageDigitalSignature()
+        keyUsageOneOfETSI319412Types()
         walletProviderExplicitExtensionCriticality()
         validAt(at)
         policyIsPresent()
